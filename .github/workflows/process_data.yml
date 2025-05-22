@@ -1,0 +1,83 @@
+name: Process Dropbox Data
+
+on:
+  workflow_dispatch: # Manual trigger
+  schedule:
+    - cron: '0 0 * * 1' # Run weekly on Mondays at midnight
+  push: # Trigger on git pushes
+
+jobs:
+  process-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Create and activate virtual environment
+        run: |
+          uv venv
+          source .venv/bin/activate
+
+      - name: Install dependencies
+        run: |
+          uv pip install -e .
+
+      - name: Setup Rclone
+        uses: AnimMouse/setup-rclone@v1
+        with:
+          rclone_config: ${{ secrets.RCLONE_CONFIG }}
+
+      - name: Create directory structure
+        run: |
+          mkdir -p preprocessed_data
+          mkdir -p outputs
+
+      - name: Sync data from Dropbox
+        run: |
+          rclone copy rdoc_dropbox:rdoc_fmri_behavior/output/raw ./raw_data
+
+      - name: Process each subject
+        run: |
+          # Get list of subject folders
+          for subject in ./raw_data/sub-*; do
+            if [ -d "$subject" ]; then
+              subject_name=$(basename "$subject")
+              echo "Processing $subject_name..."
+              
+              # Run preprocessing
+              python preprocess.py "$subject_name"
+              
+              # Run analysis
+              python analyze_behavioral_data.py "$subject_name"
+            fi
+          done
+
+      - name: Upload processed data to Dropbox
+        run: |
+          # Create a timestamp for the archive
+          timestamp=$(date +%Y%m%d_%H%M%S)
+          
+          # Upload preprocessed data
+          rclone copy ./preprocessed_data rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data
+          
+          # Upload analysis outputs
+          rclone copy ./outputs rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs
+          
+          # Archive the raw data that was processed
+          rclone copy ./raw_data rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf ./raw_data
+          echo "Temporary data cleaned up" 

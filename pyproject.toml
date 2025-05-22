@@ -1,0 +1,26 @@
+[project]
+name = "fMRI_rdoc_behavioral_QC"
+version = "0.1.0"
+description = "Behavioral QC analysis for fMRI RDoC data"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.2.6",
+    "pandas>=2.2.3",
+    "polars>=1.30.0",
+    "pydantic>=1.10.22",
+    "python-dateutil>=2.9.0",
+    "pytz>=2025.2",
+    "six>=1.17.0",
+    "typing-extensions>=4.13.2",
+    "tzdata>=2025.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["."] 
