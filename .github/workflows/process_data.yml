@@ -37,14 +37,32 @@ jobs:
         with:
           rclone_config: ${{ secrets.RCLONE_CONFIG }}
 
+      - name: Verify Rclone Configuration
+        run: |
+          echo "Verifying rclone configuration..."
+          rclone listremotes
+          rclone lsd rdoc_dropbox:rdoc_fmri_behavior/output/ || echo "Error: Could not access Dropbox directory"
+
       - name: Create directory structure
         run: |
           mkdir -p preprocessed_data
           mkdir -p outputs
+          mkdir -p raw_data
+
+      - name: List Dropbox Contents
+        run: |
+          echo "Listing Dropbox contents..."
+          rclone ls rdoc_dropbox:rdoc_fmri_behavior/output/raw/
 
       - name: Sync data from Dropbox
         run: |
-          rclone copy rdoc_dropbox:rdoc_fmri_behavior/output/raw ./raw_data
+          echo "Syncing data from Dropbox..."
+          rclone copy rdoc_dropbox:rdoc_fmri_behavior/output/raw ./raw_data --verbose
+
+      - name: List Downloaded Data
+        run: |
+          echo "Listing downloaded data..."
+          ls -la ./raw_data/
 
       - name: Process each subject
         run: |
@@ -67,14 +85,19 @@ jobs:
           # Create a timestamp for the archive
           timestamp=$(date +%Y%m%d_%H%M%S)
           
-          # Upload preprocessed data
-          rclone copy ./preprocessed_data rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data
+          echo "Creating output directories in Dropbox..."
+          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data
+          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs
+          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp}
           
-          # Upload analysis outputs
-          rclone copy ./outputs rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs
+          echo "Uploading preprocessed data..."
+          rclone copy ./preprocessed_data rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data --verbose
           
-          # Archive the raw data that was processed
-          rclone copy ./raw_data rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp}
+          echo "Uploading analysis outputs..."
+          rclone copy ./outputs rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs --verbose
+          
+          echo "Archiving raw data..."
+          rclone copy ./raw_data rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp} --verbose
 
       - name: Clean up
         if: always()
