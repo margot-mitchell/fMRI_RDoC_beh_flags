@@ -18,6 +18,7 @@ from .analyze.tasks import (
     stop_signal_rdoc,
     stroop_rdoc,
     visual_search_rdoc,
+    op_only_span_rdoc
 )
 
 def get_function_mapping(exp_name: str) -> Optional[Callable]:
@@ -41,6 +42,7 @@ def get_function_mapping(exp_name: str) -> Optional[Callable]:
         'operation_span_rdoc': operation_span_rdoc,
         'stroop_rdoc': stroop_rdoc,
         'visual_search_rdoc': visual_search_rdoc,
+        'op_only_span_rdoc': op_only_span_rdoc,
     }
     return mappings.get(exp_name, None)
 

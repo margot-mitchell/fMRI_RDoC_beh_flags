@@ -1,129 +1,110 @@
-"""Configuration file containing thresholds for behavioral data quality control.
+"""Configuration file containing threshold values for quality control flags.
 
-This module defines thresholds for flagging behavioral data based on various metrics
-such as accuracy, reaction times, and omission rates for different tasks.
+This file contains all the threshold values used to determine if a task's
+performance metrics are within acceptable ranges. These thresholds are used
+by generate_flags.py to generate quality control flags.
 """
 
 # Remove general thresholds
 # ACCURACY_THRESHOLD = 0.55
 # OMISSION_THRESHOLD = 0.5
 
-# Stop Signal Task Thresholds
-STOP_SIGNAL_ACCURACY_MIN = 0.25
-STOP_SIGNAL_ACCURACY_MAX = 0.75
-STOP_SIGNAL_GO_ACCURACY = 0.55
-STOP_SIGNAL_GO_RT = 750
-STOP_SIGNAL_OMISSION_RATE = 0.5
+# Stop Signal thresholds
+STOP_SIGNAL_GO_ACCURACY = 0.55   
+STOP_SIGNAL_GO_RT = 750       
+STOP_SIGNAL_OMISSION_RATE = 0.5 
+## Conditional accuracy threshold: if stop accuracy is < 25% OR > 75%, flag (Waiting for stop signal; not following instructions)
+STOP_SIGNAL_STOP_ACCURACY_MIN = 0.25  
+STOP_SIGNAL_STOP_ACCURACY_MAX = 0.75  
 
-# AX-CPT Task Thresholds
-AX_CPT_ACCURACY = 0.55
-AX_CPT_OMISSION_RATE = 0.5
+# AX-CPT thresholds
+AX_CPT_AX_ACCURACY = 0.55     
+AX_CPT_BX_ACCURACY = 0.55     
+AX_CPT_AY_ACCURACY = 0.55     
+AX_CPT_BY_ACCURACY = 0.55     
+AX_CPT_AX_OMISSION_RATE = 0.5  
+AX_CPT_BX_OMISSION_RATE = 0.5  
+AX_CPT_AY_OMISSION_RATE = 0.5  
+AX_CPT_BY_OMISSION_RATE = 0.5  
 
-# Go/NoGo Task Thresholds
-GONOGO_GO_ACCURACY = 0.857
-GONOGO_NOGO_ACCURACY = 0.143
-GONOGO_MEAN_ACCURACY = 0.55
-GONOGO_OMISSION_RATE = 0.5
+# Go/NoGo thresholds
+GONOGO_GO_ACCURACY_MIN = 0.857        
+GONOGO_NOGO_ACCURACY_MIN = 0.143     
+GONOGO_MEAN_ACCURACY = 0.55  
+GONOGO_GO_OMISSION_RATE = 0.5     
 
-# Operation Span Task Thresholds
-OP_SPAN_ASYMMETRIC_ACCURACY = 0.55
-OP_SPAN_SYMMETRIC_ACCURACY = 0.55
-OP_SPAN_4X4_ACCURACY = 0.25
-OP_SPAN_ORDER_DIFF = 0.4
+# Operation Only Span thresholds
+OP_ONLY_SPAN_ASYMMETRIC_ACCURACY = 0.55  
+OP_ONLY_SPAN_SYMMETRIC_ACCURACY = 0.55  
 
-# Simple Span Task Thresholds
-SIMPLE_SPAN_4X4_ACCURACY = 0.55
-SIMPLE_SPAN_ORDER_DIFF = 0.2
+# Operation Span thresholds
+OP_SPAN_ASYMMETRIC_ACCURACY = 0.55  
+OP_SPAN_SYMMETRIC_ACCURACY = 0.55   
+OP_SPAN_4X4_IRRESPECTIVE_ACCURACY = 0.25        
+OP_SPAN_ORDER_DIFF = 0.4  # if irrespective accuracy is > 40% higher than respective, flag
 
-# Cued Task Switching Thresholds
-CUED_TS_ACCURACY = 0.55
-CUED_TS_OMISSION_RATE = 0.5
+# Simple Span thresholds
+SIMPLE_SPAN_4X4_IRRESPECTIVE_ACCURACY = 0.55     
+SIMPLE_SPAN_ORDER_DIFF = 0.2  # if irrespective accuracy is > 40% higher than respective, flag
 
-# Flanker Task Thresholds
-FLANKER_ACCURACY = 0.55
-FLANKER_OMISSION_RATE = 0.5
+# N-Back thresholds
+NBACK_WEIGHTED_2BACK_ACCURACY = 0.55   
+NBACK_WEIGHTED_1BACK_ACCURACY = 0.55  
+## Weights for weighted accuracy calculation (based on the number of trials)
+NBACK_MATCH_WEIGHT = 0.2           
+NBACK_MISMATCH_WEIGHT = 0.8      
+## Conditional accuracy threshold: if mismatch is >80% AND match >20% (in either 2-back or 1-back), flag
+NBACK_MISMATCH_MIN_CONDITIONAL_ACCURACY = 0.8
+NBACK_MATCH_MIN_CONDITIONAL_ACCURACY = 0.2
 
-# N-Back Task Thresholds
-NBACK_MATCH_WEIGHT = 0.2
-NBACK_MISMATCH_WEIGHT = 0.8
-NBACK_WEIGHTED_ACCURACY = 0.55
-NBACK_MATCH_ACCURACY = 0.2
-NBACK_MISMATCH_ACCURACY = 0.8
+# Cued TS thresholds
+CUED_TS_SWITCH_STAY_ACCURACY = 0.55 
+CUED_TS_STAY_SWITCH_ACCURACY = 0.55
+CUED_TS_SWITCH_SWITCH_ACCURACY = 0.55
+CUED_TS_SWITCH_STAY_OMISSION_RATE = 0.5 
+CUED_TS_STAY_SWITCH_OMISSION_RATE = 0.5
+CUED_TS_SWITCH_SWITCH_OMISSION_RATE = 0.5
+CUED_TS_PARITY_ACCURACY = 0.55
+CUED_TS_MAGNITUDE_ACCURACY = 0.55
 
-# Spatial Cueing Task Thresholds
-SPATIAL_CUEING_ACCURACY = 0.55
-SPATIAL_CUEING_OMISSION_RATE = 0.5
+# Spatial cueing thresholds
+SPATIAL_CUEING_DOUBLE_CUE_ACCURACY = 0.55
+SPATIAL_CUEING_DOUBLE_CUE_OMISSION_RATE = 0.5
+SPATIAL_CUEING_INVALID_CUE_ACCURACY = 0.55
+SPATIAL_CUEING_INVALID_CUE_OMISSION_RATE = 0.5
+SPATIAL_CUEING_NO_CUE_ACCURACY = 0.55
+SPATIAL_CUEING_NO_CUE_OMISSION_RATE = 0.5
+SPATIAL_CUEING_VALID_CUE_ACCURACY = 0.55
+SPATIAL_CUEING_VALID_CUE_OMISSION_RATE = 0.5
 
-# Spatial Task Switching Thresholds
-SPATIAL_TS_ACCURACY = 0.55
-SPATIAL_TS_OMISSION_RATE = 0.5
+# Spatial TS thresholds
+SPATIAL_TS_STAY_STAY_ACCURACY = 0.55 
+SPATIAL_TS_STAY_SWITCH_ACCURACY = 0.55
+SPATIAL_TS_SWITCH_SWITCH_ACCURACY = 0.55
+SPATIAL_TS_STAY_STAY_OMISSION_RATE = 0.5 
+SPATIAL_TS_STAY_SWITCH_OMISSION_RATE = 0.5
+SPATIAL_TS_SWITCH_SWITCH_OMISSION_RATE = 0.5
+SPATIAL_TS_COLOR_ACCURACY = 0.55
+SPATIAL_TS_FORM_ACCURACY = 0.55
 
-# Stroop Task Thresholds
-STROOP_ACCURACY = 0.55
-STROOP_OMISSION_RATE = 0.5
+# Stroop thresholds
+STROOP_CONGRUENT_ACCURACY = 0.55
+STROOP_CONGRUENT_OMISSION_RATE = .5        
+STROOP_INCONGRUENT_ACCURACY = 0.55
+STROOP_INCONGRUENT_OMISSION_RATE = .5  
 
-# Visual Search Task Thresholds
-VISUAL_SEARCH_ACCURACY = 0.55
-VISUAL_SEARCH_OMISSION_RATE = 0.5
+# Visual search thresholds
+VISUAL_SEARCH_CONJUNCTION_24_ACCURACY = 0.55      
+VISUAL_SEARCH_CONJUNCTION_24_OMISSION_RATE = 0.5 
+VISUAL_SEARCH_CONJUNCTION_8_ACCURACY = 0.55      
+VISUAL_SEARCH_CONJUNCTION_8_OMISSION_RATE = 0.5 
+VISUAL_SEARCH_FEATURE_24_ACCURACY = 0.55      
+VISUAL_SEARCH_FEATURE_24_OMISSION_RATE = 0.5 
+VISUAL_SEARCH_FEATURE_8_ACCURACY = 0.55      
+VISUAL_SEARCH_FEATURE_8_OMISSION_RATE = 0.5 
 
-# Add THRESHOLDS dictionary
-THRESHOLDS = {
-    'stop_signal': {
-        'stop_accuracy_min': STOP_SIGNAL_ACCURACY_MIN,
-        'stop_accuracy_max': STOP_SIGNAL_ACCURACY_MAX,
-        'go_accuracy': STOP_SIGNAL_GO_ACCURACY,
-        'go_rt': STOP_SIGNAL_GO_RT,
-        'omission_rate': STOP_SIGNAL_OMISSION_RATE,
-    },
-    'ax_cpt': {
-        'accuracy': AX_CPT_ACCURACY,
-        'omission_rate': AX_CPT_OMISSION_RATE,
-    },
-    'gonogo': {
-        'go_accuracy': GONOGO_GO_ACCURACY,
-        'nogo_accuracy': GONOGO_NOGO_ACCURACY,
-        'mean_accuracy': GONOGO_MEAN_ACCURACY,
-        'omission_rate': GONOGO_OMISSION_RATE,
-    },
-    'flanker': {
-        'accuracy': FLANKER_ACCURACY,
-        'omission_rate': FLANKER_OMISSION_RATE,
-    },
-    'operation_span': {
-        'asymmetric_accuracy': OP_SPAN_ASYMMETRIC_ACCURACY,
-        'symmetric_accuracy': OP_SPAN_SYMMETRIC_ACCURACY,
-        '4x4_accuracy': OP_SPAN_4X4_ACCURACY,
-        'order_diff': OP_SPAN_ORDER_DIFF,
-    },
-    'simple_span': {
-        '4x4_accuracy': SIMPLE_SPAN_4X4_ACCURACY,
-        'order_diff': SIMPLE_SPAN_ORDER_DIFF,
-    },
-    'nback': {
-        'match_weight': NBACK_MATCH_WEIGHT,
-        'mismatch_weight': NBACK_MISMATCH_WEIGHT,
-        'weighted_accuracy': NBACK_WEIGHTED_ACCURACY,
-        'match_accuracy': NBACK_MATCH_ACCURACY,
-        'mismatch_accuracy': NBACK_MISMATCH_ACCURACY,
-    },
-    'cued_ts': {
-        'accuracy': CUED_TS_ACCURACY,
-        'omission_rate': CUED_TS_OMISSION_RATE,
-    },
-    'spatial_cueing': {
-        'accuracy': SPATIAL_CUEING_ACCURACY,
-        'omission_rate': SPATIAL_CUEING_OMISSION_RATE,
-    },
-    'spatial_ts': {
-        'accuracy': SPATIAL_TS_ACCURACY,
-        'omission_rate': SPATIAL_TS_OMISSION_RATE,
-    },
-    'stroop': {
-        'accuracy': STROOP_ACCURACY,
-        'omission_rate': STROOP_OMISSION_RATE,
-    },
-    'visual_search': {
-        'accuracy': VISUAL_SEARCH_ACCURACY,
-        'omission_rate': VISUAL_SEARCH_OMISSION_RATE,
-    },
-} 
+# Flanker thresholds
+FLANKER_ACCURACY_CONGRUENT_ACCURACY = 0.55
+FLANKER_CONGRUENT_OMISSION_RATE = .5        
+FLANKER_INCONGRUENT_ACCURACY = 0.55
+FLANKER_INCONGRUENT_OMISSION_RATE = .5   
