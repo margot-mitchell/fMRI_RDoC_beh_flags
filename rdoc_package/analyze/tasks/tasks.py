@@ -326,12 +326,19 @@ def ax_cpt_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with specified metrics in the requested order.
     """
-    trial_ids = df.select('trial_id').unique().to_series().to_list()
-
-    if 'test_trial' in trial_ids:
-        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
     else:
-        test_trials = df.filter(pl.col('trial_id') == 'test_probe')
+        # For test data, filter for test trials
+        trial_ids = df.select('trial_id').unique().to_series().to_list()
+        if 'test_trial' in trial_ids:
+            test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+        else:
+            test_trials = df.filter(pl.col('trial_id') == 'test_probe')
 
     if 'success' not in test_trials.columns and 'correct_trial' in test_trials.columns:
         test_trials = test_trials.with_columns(success=pl.col('correct_trial'))
@@ -382,18 +389,18 @@ def ax_cpt_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
     proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
 
-    # Create DataFrame with all metrics in the specified order
+    # Create final metrics DataFrame with specified order
     metrics_df = pl.DataFrame({
         'metric': [
             'AX_accuracy',
             'AX_omission_rate',
             'AX_rt',
-            'AY_accuracy',
-            'AY_omission_rate',
-            'AY_rt',
             'BX_accuracy',
             'BX_omission_rate',
             'BX_rt',
+            'AY_accuracy',
+            'AY_omission_rate',
+            'AY_rt',
             'BY_accuracy',
             'BY_omission_rate',
             'BY_rt',
@@ -404,12 +411,12 @@ def ax_cpt_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             get_metric('AX', 'accuracy'),
             get_metric('AX', 'omission_rate'),
             get_metric('AX', 'rt'),
-            get_metric('AY', 'accuracy'),
-            get_metric('AY', 'omission_rate'),
-            get_metric('AY', 'rt'),
             get_metric('BX', 'accuracy'),
             get_metric('BX', 'omission_rate'),
             get_metric('BX', 'rt'),
+            get_metric('AY', 'accuracy'),
+            get_metric('AY', 'omission_rate'),
+            get_metric('AY', 'rt'),
             get_metric('BY', 'accuracy'),
             get_metric('BY', 'omission_rate'),
             get_metric('BY', 'rt'),
@@ -484,7 +491,15 @@ def cued_task_switching_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with 'metric' and 'value' columns.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
 
     test_trials = test_trials.with_columns(
         success=pl.when(pl.col('response') == pl.col('correct_response'))
@@ -573,16 +588,24 @@ def flanker_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with 'metric' and 'value' columns.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        trials = df
+    else:
+        # For test data, filter for test trials
+        trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Calculate metrics for congruent trials
-    congruent_trials = test_trials.filter(pl.col('condition').str.to_lowercase() == 'congruent')
+    congruent_trials = trials.filter(pl.col('condition').str.to_lowercase() == 'congruent')
     congruent_accuracy = congruent_trials.select(pl.col('correct_trial').mean()).item()
     congruent_omission = congruent_trials.filter(pl.col('response').is_null()).height / congruent_trials.height if congruent_trials.height > 0 else None
     congruent_rt = congruent_trials.select(pl.col('rt').mean()).item()
     
     # Calculate metrics for incongruent trials
-    incongruent_trials = test_trials.filter(pl.col('condition').str.to_lowercase() == 'incongruent')
+    incongruent_trials = trials.filter(pl.col('condition').str.to_lowercase() == 'incongruent')
     incongruent_accuracy = incongruent_trials.select(pl.col('correct_trial').mean()).item()
     incongruent_omission = incongruent_trials.filter(pl.col('response').is_null()).height / incongruent_trials.height if incongruent_trials.height > 0 else None
     incongruent_rt = incongruent_trials.select(pl.col('rt').mean()).item()
@@ -633,7 +656,15 @@ def go_nogo_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with specified metrics in the requested order.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Calculate go trial metrics
     go_trials = test_trials.filter(pl.col('condition') == 'go')
@@ -686,7 +717,15 @@ def n_back_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with 'metric' and 'value' columns.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # If delay column doesn't exist, use condition column instead
     group_by = ['condition']
@@ -730,8 +769,17 @@ def operation_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with 'metric' and 'value' columns.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
-    processing_trials = df.filter(pl.col('trial_id') == 'test_inter-stimulus')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+        processing_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+        processing_trials = df.filter(pl.col('trial_id') == 'test_inter-stimulus')
 
     # Debug logging for data presence
     num_valid_responses = test_trials.filter(pl.col('valid_responses').is_not_null()).height
@@ -741,28 +789,31 @@ def operation_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     def calculate_processing_metrics(
         processing_trials: pl.DataFrame, full_df: pl.DataFrame
     ) -> pl.DataFrame:
+        # Find all grid trials
         grid_trials = full_df.filter(
             (pl.col('trial_id') == 'test_trial')
-            & (pl.col('internal_node_id').str.contains('0.0-3.0'))
+            & (pl.col('internal_node_id').str.contains('0.0-6'))
         )
 
         grid_indices = grid_trials.select('trial_index').to_series().to_list()
 
-        processing_after_grid = []
+        # Find the last processing trial before each grid trial
+        last_processing_before_grid = []
         for grid_idx in grid_indices:
-            next_trial = (
+            prev_trial = (
                 full_df.filter(
-                    (pl.col('trial_index') > grid_idx)
+                    (pl.col('trial_index') < grid_idx)
                     & (pl.col('trial_id') == 'test_inter-stimulus')
                 )
                 .select('trial_index')
-                .min()
+                .max()
             )
-            if next_trial is not None:
-                processing_after_grid.append(next_trial.item())
+            if prev_trial is not None:
+                last_processing_before_grid.append(prev_trial.item())
 
+        # Get all processing trials except the last ones before grid trials
         relevant_trials = processing_trials.filter(
-            pl.col('trial_index').is_in(processing_after_grid)
+            ~pl.col('trial_index').is_in(last_processing_before_grid)
         )
 
         overall_omission_rate = relevant_trials.select(
@@ -839,32 +890,48 @@ def op_only_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with 'metric' and 'value' columns.
     """
-    # All test trials are operation-only in this task
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
-    processing_trials = df.filter(pl.col('trial_id') == 'test_inter-stimulus')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+        processing_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+        processing_trials = df.filter(pl.col('trial_id') == 'test_inter-stimulus')
 
     def calculate_processing_metrics(
         processing_trials: pl.DataFrame, full_df: pl.DataFrame
     ) -> pl.DataFrame:
+        # Find all grid trials
         grid_trials = full_df.filter(pl.col('trial_id') == 'test_trial')
         grid_indices = grid_trials.select('trial_index').to_series().to_list()
 
-        processing_after_grid = []
+        # Find the last processing trial before each grid trial
+        last_processing_before_grid = []
         for grid_idx in grid_indices:
-            next_trial = (
+            prev_trial = (
                 full_df.filter(
-                    (pl.col('trial_index') > grid_idx)
+                    (pl.col('trial_index') < grid_idx)
                     & (pl.col('trial_id') == 'test_inter-stimulus')
                 )
                 .select('trial_index')
-                .min()
+                .max()
             )
-            if next_trial is not None:
-                processing_after_grid.append(next_trial.item())
+            if prev_trial is not None:
+                last_processing_before_grid.append(prev_trial.item())
 
+        # Get all processing trials except the last ones before grid trials
         relevant_trials = processing_trials.filter(
-            pl.col('trial_index').is_in(processing_after_grid)
+            ~pl.col('trial_index').is_in(last_processing_before_grid)
         )
+
+        # Calculate omission rate
+        overall_omission_rate = relevant_trials.select(
+            pl.col('rt').is_null().mean()
+        ).item()
 
         # Get metrics for both symmetric and asymmetric trials
         symmetric_trials = relevant_trials.filter(pl.col('grid_symmetry') == 'symmetric')
@@ -882,7 +949,8 @@ def op_only_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             '8x8_symmetric_accuracy': symmetric_accuracy,
             '8x8_symmetric_rt': symmetric_rt,
             '8x8_asymmetric_accuracy': asymmetric_accuracy,
-            '8x8_asymmetric_rt': asymmetric_rt
+            '8x8_asymmetric_rt': asymmetric_rt,
+            '8x8_grid_omission_rate': overall_omission_rate
         }
         
         # Convert all values to float, handling None values
@@ -927,7 +995,15 @@ def simple_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with 'metric' and 'value' columns.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
 
     mean_4x4_grid_accuracy_entirely_correct = test_trials.select(
         pl.col('correct_trial').mean()
@@ -969,7 +1045,15 @@ def spatial_cueing_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with specified metrics in the requested order.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Group by 'condition' to get metrics for each cue type
     metrics = get_metrics(test_trials, group_by=['condition'])
@@ -1013,11 +1097,15 @@ def spatial_task_switching_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with 'metric' and 'value' columns.
     """
-    # Filter dataframe for test trials only, excluding practice
-    test_trials = df.filter(
-        (pl.col('trial_id') == 'test_trial') & 
-        (~pl.col('trial_id').str.to_lowercase().str.contains('practice'))
-    )
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
 
     # Use correct_trial directly instead of calculating success
     test_trials = test_trials.with_columns(
@@ -1124,7 +1212,15 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with specified metrics in the requested order.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Calculate go trial metrics
     go_trials = test_trials.filter(pl.col('condition') == 'go')
@@ -1137,12 +1233,21 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     # Calculate SSD metrics
     ssd_metrics = {}
     if 'SSD' in test_trials.columns:
-        ssd_metrics = {
-            'min_SSD': float(test_trials.select(pl.col('SSD').min()).item()),
-            'max_SSD': float(test_trials.select(pl.col('SSD').max()).item()),
-            'mean_SSD': float(test_trials.select(pl.col('SSD').mean()).item()),
-            'final_SSD': float(test_trials.select(pl.col('SSD').last()).item()),
-        }
+        try:
+            ssd_metrics = {
+                'min_SSD': float(test_trials.select(pl.col('SSD').min()).item() or 0),
+                'max_SSD': float(test_trials.select(pl.col('SSD').max()).item() or 0),
+                'mean_SSD': float(test_trials.select(pl.col('SSD').mean()).item() or 0),
+                'final_SSD': float(test_trials.select(pl.col('SSD').last()).item() or 0),
+            }
+        except (TypeError, ValueError):
+            # If any conversion fails, use 0 as default
+            ssd_metrics = {
+                'min_SSD': 0.0,
+                'max_SSD': 0.0,
+                'mean_SSD': 0.0,
+                'final_SSD': 0.0,
+            }
     
     # Calculate proportion_feedback
     def parse_feedback(x):
@@ -1159,28 +1264,28 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     # Create final metrics DataFrame with specified order
     metrics_df = pl.DataFrame({
         'metric': [
-            'final_SSD',
             'go_accuracy',
             'go_omission_rate',
             'go_rt',
+            'stop_accuracy',
+            'stop_omission_rate',
+            'min_SSD',
             'max_SSD',
             'mean_SSD',
-            'min_SSD',
-            'proportion_feedback',
-            'stop_accuracy',
-            'stop_rt'
+            'final_SSD',
+            'proportion_feedback'
         ],
         'value': [
-            ssd_metrics.get('final_SSD'),
             go_metrics['accuracy'][0] if go_metrics.height > 0 else None,
             go_metrics['omission_rate'][0] if go_metrics.height > 0 else None,
             go_metrics['rt'][0] if go_metrics.height > 0 else None,
+            stop_metrics['accuracy'][0] if stop_metrics.height > 0 else None,
+            stop_metrics['omission_rate'][0] if stop_metrics.height > 0 else None,
+            ssd_metrics.get('min_SSD'),
             ssd_metrics.get('max_SSD'),
             ssd_metrics.get('mean_SSD'),
-            ssd_metrics.get('min_SSD'),
-            proportion_feedback,
-            stop_metrics['accuracy'][0] if stop_metrics.height > 0 else None,
-            stop_metrics['rt'][0] if stop_metrics.height > 0 else None
+            ssd_metrics.get('final_SSD'),
+            proportion_feedback
         ]
     })
     
@@ -1195,7 +1300,15 @@ def stroop_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with specified metrics in the requested order.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Calculate metrics for congruent trials
     congruent_trials = test_trials.filter(pl.col('condition').str.to_lowercase() == 'congruent')
@@ -1222,8 +1335,8 @@ def stroop_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
     proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
     
-    # Create DataFrame with all metrics in the specified order
-    metrics = pl.DataFrame({
+    # Create final metrics DataFrame with specified order
+    metrics_df = pl.DataFrame({
         'metric': [
             'congruent_accuracy',
             'congruent_omission_rate',
@@ -1244,7 +1357,7 @@ def stroop_rdoc(df: pl.DataFrame) -> pl.DataFrame:
         ]
     })
     
-    return metrics
+    return metrics_df
 
 def visual_search_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     """Process visual search task data and report specified metrics and proportion_feedback.
@@ -1255,7 +1368,15 @@ def visual_search_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         pl.DataFrame: DataFrame with specified metrics in the requested order.
     """
-    test_trials = df.filter(pl.col('trial_id') == 'test_trial')
+    # Check if this is a pretouch file by looking at the trial_id values
+    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
+    
+    if is_pretouch:
+        # For pretouch data, use all trials
+        test_trials = df
+    else:
+        # For test data, filter for test trials
+        test_trials = df.filter(pl.col('trial_id') == 'test_trial')
 
     # Map condition and set size
     test_trials = test_trials.with_columns([
