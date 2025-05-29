@@ -157,7 +157,7 @@ def get_required_columns(task_name: str) -> Set[str]:
             'stim', 'stimulus', 'stimulus_duration', 'success', 'time_elapsed', 
             'trial_duration', 'trial_id', 'trial_index', 'trial_type'
         },
-        'OpSpan': {
+        'opSpan': {
             'ITIParams', 'accuracy', 'block_duration', 'block_level_feedback', 'block_num', 
             'cell_order_through_grid', 'choices', 'condition', 'correct_cell_order', 
             'correct_spatial_judgement_key', 'correct_trial', 'design_perm', 
@@ -240,7 +240,12 @@ def get_trialdata_df(data: Dict) -> pl.DataFrame:
     if isinstance(data, dict) and 'trialdata' in data:
         trialdata = data['trialdata']
         if isinstance(trialdata, str):
-            trialdata = json.loads(trialdata)
+            try:
+                # First try to parse the trialdata string as JSON
+                trialdata = json.loads(trialdata)
+            except json.JSONDecodeError:
+                # If that fails, try to parse it as a list of JSON objects
+                trialdata = [json.loads(item) for item in trialdata.strip('[]').split(',')]
         data = trialdata
     
     # Ensure data is a list of dictionaries
@@ -282,29 +287,175 @@ def main():
     total_files = len(json_files)
     logging.info(f'Found {total_files} JSON files to process')
 
+    # Task name mapping for pretouch files
+    pretouch_task_mapping = {
+        # AX-CPT variations
+        'ax_cpt_rdoc': 'axCPT',
+        'ax_cpt': 'axCPT',
+        'axCPT': 'axCPT',
+        
+        # Cued Task Switching variations
+        'cued_task_switching_rdoc': 'cuedTS',
+        'cued_task_switching': 'cuedTS',
+        'cuedTS': 'cuedTS',
+        
+        # Flanker variations
+        'flanker_rdoc': 'flanker',
+        'flanker': 'flanker',
+        
+        # Go/No-Go variations
+        'go_nogo_rdoc': 'goNogo',
+        'go_nogo': 'goNogo',
+        'goNogo': 'goNogo',
+        
+        # Spatial Task Switching variations
+        'spatial_task_switching_rdoc': 'spatialTS',
+        'spatial_task_switching': 'spatialTS',
+        'spatialTS': 'spatialTS',
+        
+        # Stop Signal variations
+        'stop_signal_rdoc': 'stopSignal',
+        'stop_signal': 'stopSignal',
+        'stopSignal': 'stopSignal',
+        
+        # Stroop variations
+        'stroop_rdoc': 'stroop',
+        'stroop': 'stroop',
+        
+        # Simple Span variations
+        'simple_span_rdoc': 'simpleSpan',
+        'simple_span': 'simpleSpan',
+        'simpleSpan': 'simpleSpan',
+        
+        # Operation Span variations
+        'operation_span_rdoc': 'opSpan',
+        'operation_span': 'opSpan',
+        'opSpan': 'opSpan',
+        'OpSpan': 'opSpan',
+        
+        # Operation Only variations
+        'operation_only_span_rdoc': 'opOnly',
+        'operation_only': 'opOnly',
+        'opOnly': 'opOnly',
+        
+        # N-Back variations
+        'n_back_rdoc': 'nBack',
+        'n_back': 'nBack',
+        'nBack': 'nBack',
+        
+        # Spatial Cueing variations
+        'spatial_cueing_rdoc': 'spatialCueing',
+        'spatial_cueing': 'spatialCueing',
+        'spatialCueing': 'spatialCueing',
+        
+        # Visual Search variations
+        'visual_search_rdoc': 'visualSearch',
+        'visual_search': 'visualSearch',
+        'visualSearch': 'visualSearch',
+        'visual': 'visualSearch'
+    }
+
     for index, filepath in enumerate(json_files, start=1):
         logging.info(f'Processing file {index} of {total_files}: {filepath}')
 
-        # Extract task name and date_time from filename
-        # Filename format: sub-SK_ses-1_task-{task_name}_dateTime-{timestamp}_run-1.json
         filename = os.path.basename(filepath)
         parts = filename.split('_')
         task_name = None
+        task_parts = []
+        found_task = False
         for part in parts:
             if part.startswith('task-'):
-                task_name = part[5:]  # Remove 'task-' prefix
+                found_task = True
+                task_parts.append(part[5:])  # Remove 'task-' prefix
+            elif found_task and not part.startswith(('ses-', 'run-', 'fmri', 'dateTime')):
+                task_parts.append(part)
+            elif found_task and (part.startswith(('ses-', 'run-', 'fmri', 'dateTime')) or part == 'practice'):
                 break
         
-        if task_name is None:
-            logging.error(f'Could not extract task name from {filename}')
+        if task_parts:
+            task_name = '_'.join(task_parts)
+        else:
+            logging.error(f'Could not extract task name from {filepath}')
+            continue
+
+        # Load the JSON data
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+        except Exception as e:
+            logging.error(f'Error loading {filepath}: {str(e)}')
+            continue
+
+        # Special check for pretouch files
+        subfolder_name = None
+        if 'pretouch' in filename.lower() or 'practice' in filename.lower():
+            # Handle case where data is already a list of trial data
+            if isinstance(data, list):
+                exp_id = ''
+            else:
+                exp_id = data.get('exp_id', '')
+            # Check if task name is a substring of exp_id or vice versa
+            if exp_id and task_name and not (task_name in exp_id or exp_id in task_name):
+                logging.error(f"exp_id '{exp_id}' does not match extracted task name '{task_name}' in {filepath}. Skipping.")
+                continue
+            # Use mapping for pretouch files
+            task_name_lower = task_name.lower()
+            # First try exact match
+            if task_name in pretouch_task_mapping:
+                subfolder_name = pretouch_task_mapping[task_name] + "_practice"
+            elif task_name_lower in pretouch_task_mapping:
+                subfolder_name = pretouch_task_mapping[task_name_lower] + "_practice"
+            else:
+                # Then try matching with _rdoc suffix
+                task_name_with_rdoc = task_name_lower + '_rdoc'
+                if task_name_with_rdoc in pretouch_task_mapping:
+                    subfolder_name = pretouch_task_mapping[task_name_with_rdoc] + "_practice"
+                else:
+                    # Finally try partial match as fallback
+                    for key, mapped_name in pretouch_task_mapping.items():
+                        if key in task_name_lower:
+                            subfolder_name = mapped_name + "_practice"
+                            break
+        else:
+            # For non-practice files, use the mapping without _practice suffix
+            if task_name in pretouch_task_mapping:
+                subfolder_name = pretouch_task_mapping[task_name]
+            else:
+                task_name_lower = task_name.lower()
+                if task_name_lower in pretouch_task_mapping:
+                    subfolder_name = pretouch_task_mapping[task_name_lower]
+                else:
+                    task_name_with_rdoc = task_name_lower + '_rdoc'
+                    if task_name_with_rdoc in pretouch_task_mapping:
+                        subfolder_name = pretouch_task_mapping[task_name_with_rdoc]
+                    else:
+                        for key, mapped_name in pretouch_task_mapping.items():
+                            if key in task_name_lower:
+                                subfolder_name = mapped_name
+                                break
+
+        if subfolder_name is None:
+            logging.error(f'Could not determine subfolder name for {filepath}')
             continue
 
         # Create output directory structure
-        task_dir = os.path.join(preprocessed_dir, task_name)
+        task_dir = os.path.join(preprocessed_dir, subfolder_name)
         os.makedirs(task_dir, exist_ok=True)
 
         # Create output filename
-        outname = f'{subject_folder}_task-{task_name}_{filename[:-5]}.parquet'  # Remove .json extension
+        # Extract run number if present
+        run_num = None
+        for part in parts:
+            if part.startswith('run-'):
+                run_num = part[4:]
+                break
+        
+        # Create a cleaner output filename
+        if run_num:
+            outname = f'{subject_folder}_task-{task_name}_run-{run_num}.parquet'
+        else:
+            outname = f'{subject_folder}_task-{task_name}.parquet'
+            
         outpath = os.path.join(task_dir, outname)
 
         # Skip if file already exists
@@ -313,19 +464,28 @@ def main():
             continue
 
         try:
-            # Load and process the JSON data
-            data = load_json(filepath)
+            # Process the JSON data
             df = get_trialdata_df(data)
             
-            # Validate required columns
-            if not validate_columns(df, task_name):
-                logging.error(f'Skipping {filepath} due to missing required columns')
-                continue
+            # Different validation for practice vs non-practice tasks
+            if 'pretouch' in filename.lower() or 'practice' in filename.lower():
+                # For practice tasks, verify task name matches exp_id
+                if isinstance(data, list):
+                    exp_id = ''
+                else:
+                    exp_id = data.get('exp_id', '')
+                if exp_id and task_name and not (task_name in exp_id or exp_id in task_name):
+                    logging.error(f"Skipping {filepath} because exp_id '{exp_id}' does not match task name '{task_name}'")
+                    continue
+            else:
+                # For non-practice tasks, verify required columns
+                if not validate_columns(df, subfolder_name):
+                    logging.error(f'Skipping {filepath} due to missing required columns')
+                    continue
             
             # Save as parquet
             df.write_parquet(outpath)
             logging.info(f'Saved preprocessed data to {outpath}')
-            
         except Exception as e:
             logging.error(f'Error processing {filepath}: {str(e)}')
             continue
