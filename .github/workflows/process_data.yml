@@ -66,6 +66,9 @@ jobs:
 
       - name: Process each subject
         run: |
+          # Activate virtual environment
+          source .venv/bin/activate
+          
           # Get list of subject folders
           for subject in ./raw_data/sub-*; do
             if [ -d "$subject" ]; then
@@ -73,34 +76,60 @@ jobs:
               echo "Processing $subject_name..."
               
               # Run preprocessing
-              python preprocess.py "$subject_name"
+              echo "Running preprocessing for $subject_name..."
+              python preprocess.py "$subject_name" || {
+                echo "Error: Preprocessing failed for $subject_name"
+                exit 1
+              }
               
               # Run metrics calculation
-              python calculate_metrics.py "$subject_name"
+              echo "Running metrics calculation for $subject_name..."
+              python calculate_metrics.py "$subject_name" || {
+                echo "Error: Metrics calculation failed for $subject_name"
+                exit 1
+              }
               
               # Generate flags
-              python generate_flags.py "$subject_name"
+              echo "Generating flags for $subject_name..."
+              python generate_flags.py "$subject_name" || {
+                echo "Error: Flag generation failed for $subject_name"
+                exit 1
+              }
+              
+              echo "Successfully processed $subject_name"
             fi
           done
 
       - name: Upload processed data to Dropbox
         run: |
+          # Activate virtual environment
+          source .venv/bin/activate
+          
           # Create a timestamp for the archive
           timestamp=$(date +%Y%m%d_%H%M%S)
           
           echo "Creating output directories in Dropbox..."
-          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data
-          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs
-          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp}
+          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data || echo "Warning: Could not create preprocessed_data directory"
+          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs || echo "Warning: Could not create analysis_outputs directory"
+          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp} || echo "Warning: Could not create archive directory"
           
           echo "Uploading preprocessed data..."
-          rclone copy ./preprocessed_data rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data --verbose
+          rclone copy ./preprocessed_data rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data --verbose || {
+            echo "Error: Failed to upload preprocessed data"
+            exit 1
+          }
           
           echo "Uploading analysis outputs..."
-          rclone copy ./outputs rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs --verbose
+          rclone copy ./outputs rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs --verbose || {
+            echo "Error: Failed to upload analysis outputs"
+            exit 1
+          }
           
           echo "Archiving raw data..."
-          rclone copy ./raw_data rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp} --verbose
+          rclone copy ./raw_data rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp} --verbose || {
+            echo "Error: Failed to archive raw data"
+            exit 1
+          }
 
       - name: Clean up
         if: always()
