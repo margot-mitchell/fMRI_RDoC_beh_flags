@@ -36,6 +36,10 @@ def get_function_mapping(task_dir):
     # Normalize task directory name to handle different variations
     normalized_dir = task_dir.lower().replace('-', '_')
     
+    # Remove "_practice" suffix if present
+    if normalized_dir.endswith('_practice'):
+        normalized_dir = normalized_dir[:-9]  # Remove "_practice" suffix
+    
     # Handle special cases
     if normalized_dir in ['opspan', 'op_only_span']:
         return operation_span_rdoc
