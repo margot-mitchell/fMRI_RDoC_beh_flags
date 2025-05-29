@@ -19,16 +19,35 @@ jobs:
           python-version: '3.10'
 
       - name: Install uv
-        run: pip install uv
+        run: |
+          echo "Installing uv..."
+          python -m pip install --upgrade pip
+          python -m pip install uv
+          echo "uv version:"
+          uv --version
 
       - name: Create venv with uv
-        run: uv venv
+        run: |
+          echo "Creating virtual environment..."
+          uv venv
+          echo "Virtual environment created at:"
+          ls -la .venv/bin/
 
       - name: Install dependencies
         run: |
+          echo "Activating virtual environment..."
           source .venv/bin/activate
+          echo "Python path:"
+          which python
+          echo "Installing pip in virtual environment..."
+          curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+          python get-pip.py
+          echo "Installing requirements..."
           python -m pip install -r requirements.txt
+          echo "Installing package in editable mode..."
           pip install -e .
+          echo "Installed packages:"
+          pip list
 
       - name: Setup Rclone
         uses: AnimMouse/setup-rclone@v1
