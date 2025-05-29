@@ -75,8 +75,11 @@ jobs:
               # Run preprocessing
               python preprocess.py "$subject_name"
               
-              # Run analysis
-              python analyze_behavioral_data.py "$subject_name"
+              # Run metrics calculation
+              python calculate_metrics.py "$subject_name"
+              
+              # Generate flags
+              python generate_flags.py "$subject_name"
             fi
           done
 
