@@ -19,18 +19,16 @@ jobs:
           python-version: '3.10'
 
       - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        run: pip install uv
 
-      - name: Create and activate virtual environment
-        run: |
-          uv venv
-          source .venv/bin/activate
+      - name: Create venv with uv
+        run: uv venv
 
       - name: Install dependencies
         run: |
-          uv pip install -e .
+          source .venv/bin/activate
+          python -m pip install -r requirements.txt
+          pip install -e .
 
       - name: Setup Rclone
         uses: AnimMouse/setup-rclone@v1
