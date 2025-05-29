@@ -39,4 +39,10 @@ logs/
 
 # OS specific
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# New entries
+temp_data/
+rdoc_package.egg-info/
+__pycache__/
+.venv/ 

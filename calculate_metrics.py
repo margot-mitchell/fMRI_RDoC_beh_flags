@@ -36,9 +36,11 @@ def get_function_mapping(task_dir):
     # Normalize task directory name to handle different variations
     normalized_dir = task_dir.lower().replace('-', '_')
     
-    # Remove "_practice" suffix if present
-    if normalized_dir.endswith('_practice'):
-        normalized_dir = normalized_dir[:-9]  # Remove "_practice" suffix
+    # Remove any suffixes like _practice, _rdoc, _fmri
+    suffixes_to_remove = ['_practice', '_rdoc', '_fmri', '__fmri']
+    for suffix in suffixes_to_remove:
+        if normalized_dir.endswith(suffix):
+            normalized_dir = normalized_dir[:-len(suffix)]
     
     # Handle special cases
     if normalized_dir in ['opspan', 'op_only_span']:
@@ -72,91 +74,98 @@ def get_function_mapping(task_dir):
     return mappings.get(normalized_dir, None)
 
 def main():
-    # Check if subject folder is provided
-    if len(sys.argv) != 2:
-        print("Error: Please provide a subject folder name")
-        print("Usage: python calculate_metrics.py <subject_folder>")
-        print("Example: python calculate_metrics.py sub-SK")
-        sys.exit(1)
-
-    subject_folder = sys.argv[1]
-    
     # Configure logging
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.WARNING)
 
-    # Set up input directory
-    preprocessed_dir = os.path.join('preprocessed_data', subject_folder)
-
-    # Check if directory exists
-    if not os.path.exists(preprocessed_dir):
-        logging.error(f'Directory {preprocessed_dir} does not exist')
+    if len(sys.argv) == 2:
+        # Single subject mode
+        subject_folders = [sys.argv[1]]
+    elif len(sys.argv) == 1:
+        # All subjects mode
+        preprocessed_dir = 'preprocessed_data'
+        subject_folders = [f for f in os.listdir(preprocessed_dir)
+                           if os.path.isdir(os.path.join(preprocessed_dir, f)) and f.startswith('sub-')]
+        if not subject_folders:
+            print(f"No subject folders found in {preprocessed_dir}")
+            sys.exit(1)
+        print(f"Processing all subjects: {', '.join(subject_folders)}")
+    else:
+        print("Usage: python calculate_metrics.py <subject_folder>")
+        print("Example: python calculate_metrics.py sub-SK")
+        print("Or run without arguments to process all subjects.")
         sys.exit(1)
 
-    # Get all task directories
-    task_dirs = [d for d in os.listdir(preprocessed_dir) 
-                if os.path.isdir(os.path.join(preprocessed_dir, d))]
-
-    # Prepare output directory
-    output_dir = os.path.join('outputs', subject_folder)
-    metrics_dir = os.path.join(output_dir, 'metrics')
-    os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(metrics_dir, exist_ok=True)
-
-    # Process each task
-    for task_dir in task_dirs:
-        # Convert task directory name to experiment name format
-        exp_name = task_dir.lower().replace('-', '_') + '_rdoc'
+    for subject_folder in subject_folders:
+        print(f"\nProcessing subject folder: {subject_folder}")
         
-        # Get the analysis function for this task
-        analysis_func = get_function_mapping(task_dir)
-        if analysis_func is None:
-            logging.warning(f'Unknown task: {task_dir}')
+        # Get all task directories for this subject
+        preprocessed_dir = os.path.join('preprocessed_data', subject_folder)
+        if not os.path.exists(preprocessed_dir):
+            logging.error(f'Directory {preprocessed_dir} does not exist')
             continue
 
-        # Get all parquet files for this task
-        task_path = os.path.join(preprocessed_dir, task_dir)
-        parquet_files = [f for f in os.listdir(task_path) if f.endswith('.parquet')]
+        # Get all task directories
+        task_dirs = [d for d in os.listdir(preprocessed_dir)
+                    if os.path.isdir(os.path.join(preprocessed_dir, d))]
 
-        if not parquet_files:
-            logging.warning(f'No parquet files found in {task_path}')
-            continue
+        # Prepare output directory
+        output_dir = os.path.join('results', 'metrics', subject_folder)
+        os.makedirs(output_dir, exist_ok=True)
 
-        task_metrics_list = []
-        # Process each file
-        for parquet_file in parquet_files:
-            file_path = os.path.join(task_path, parquet_file)
-            try:
-                # Read the parquet file
-                df = pl.read_parquet(file_path)
-                
-                # Calculate metrics
-                metrics = analysis_func(df)
-                
-                # Add task and file information
-                metrics = metrics.with_columns([
-                    pl.lit(task_dir).alias('task'),
-                    pl.lit(parquet_file).alias('file')
-                ])
-                
-                # Reorder columns to put metric first
-                metrics = metrics.select(['metric', 'value', 'task', 'file'])
-                
-                task_metrics_list.append(metrics)
-                
-            except Exception as e:
-                logging.error(f'Error processing {file_path}: {str(e)}')
+        # Process each task
+        for task_dir in task_dirs:
+            print(f"  Processing task: {task_dir}")
+            
+            # Get the analysis function for this task
+            analysis_func = get_function_mapping(task_dir)
+            if analysis_func is None:
+                logging.warning(f'Unknown task: {task_dir}')
                 continue
 
-        # Save all metrics for this task to CSV
-        if task_metrics_list:
-            task_metrics_df = pl.concat(task_metrics_list)
-            # Special case for operation span to ensure lowercase 'o'
-            if task_dir.lower() in ['opspan', 'op_only_span']:
-                metrics_csv_path = os.path.join(metrics_dir, 'opSpan_metrics.csv')
-            else:
-                metrics_csv_path = os.path.join(metrics_dir, f'{task_dir}_metrics.csv')
-            task_metrics_df.write_csv(metrics_csv_path)
-            logging.info(f'Metrics for {task_dir} saved to {metrics_csv_path}')
+            # Get all parquet files for this task
+            task_path = os.path.join(preprocessed_dir, task_dir)
+            parquet_files = [f for f in os.listdir(task_path) if f.endswith('.parquet')]
+
+            if not parquet_files:
+                logging.warning(f'No parquet files found in {task_path}')
+                continue
+
+            task_metrics_list = []
+            # Process each file
+            for parquet_file in parquet_files:
+                file_path = os.path.join(task_path, parquet_file)
+                try:
+                    # Read the parquet file
+                    df = pl.read_parquet(file_path)
+                    
+                    # Calculate metrics
+                    metrics = analysis_func(df)
+                    
+                    # Add task and file information
+                    metrics = metrics.with_columns([
+                        pl.lit(task_dir).alias('task'),
+                        pl.lit(parquet_file).alias('file')
+                    ])
+                    
+                    # Reorder columns to put metric first
+                    metrics = metrics.select(['metric', 'value', 'task', 'file'])
+                    
+                    task_metrics_list.append(metrics)
+                    
+                except Exception as e:
+                    logging.error(f'Error processing {file_path}: {str(e)}')
+                    continue
+
+            # Save all metrics for this task to CSV
+            if task_metrics_list:
+                task_metrics_df = pl.concat(task_metrics_list)
+                # Special case for operation span to ensure lowercase 'o'
+                if task_dir.lower() in ['opspan', 'op_only_span']:
+                    metrics_csv_path = os.path.join(output_dir, 'opSpan_metrics.csv')
+                else:
+                    metrics_csv_path = os.path.join(output_dir, f'{task_dir}_metrics.csv')
+                task_metrics_df.write_csv(metrics_csv_path)
+                print(f"    Saved metrics to {metrics_csv_path}")
 
 if __name__ == '__main__':
     main() 

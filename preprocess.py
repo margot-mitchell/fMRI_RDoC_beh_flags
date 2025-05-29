@@ -1,11 +1,11 @@
-"""Preprocesses raw behavioral JSON files from Expfactory Deploy and converts them to parquet format for analysis.
+"""Preprocesses raw behavioral JSON files and converts them to parquet format for analysis.
 
 Usage:
     python preprocess.py <subject_folder>
     Example: python preprocess.py sub-sM
 
 This script expects input files in:
-    rdoc_dropbox:rdoc_fmri_behavior/output/archive/<subject_folder>/**/*.json
+    output/raw/<subject_folder>/**/*.json
 and outputs to:
     preprocessed_data/<subject_folder>/<task_name>/<parquet files>
 """
@@ -257,38 +257,37 @@ def get_trialdata_df(data: Dict) -> pl.DataFrame:
     return pl.from_dicts(data)
 
 
-def main():
-    # Check if subject folder is provided
-    if len(sys.argv) != 2:
-        print("Error: Please provide a subject folder name")
-        print("Usage: python preprocess.py <subject_folder>")
-        print("Example: python preprocess.py sub-sM")
-        sys.exit(1)
-
-    subject_folder = sys.argv[1]
+def process_file(filepath: str, output_dir: str) -> None:
+    """Process a single JSON file and save it as parquet.
     
-    # Configure logging
-    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+    Args:
+        filepath (str): Path to the input JSON file
+        output_dir (str): Directory to save the output parquet file
+    """
+    filename = os.path.basename(filepath)
+    parts = filename.split('_')
+    task_name = None
+    task_parts = []
+    found_task = False
+    
+    # Extract task name from filename
+    for part in parts:
+        if part.startswith('task-'):
+            found_task = True
+            task_parts.append(part[5:])  # Remove 'task-' prefix
+        elif found_task and not part.startswith(('ses-', 'run-', 'fmri', 'dateTime')):
+            task_parts.append(part)
+        elif found_task and (part.startswith(('ses-', 'run-', 'fmri', 'dateTime')) or part == 'practice'):
+            break
+    
+    if task_parts:
+        task_name = '_'.join(task_parts)
+    else:
+        logging.error(f'Could not extract task name from {filepath}')
+        return
 
-    # Set up directories
-    raw_data_dir = os.path.join('raw_data', subject_folder)
-    preprocessed_dir = os.path.join('preprocessed_data', subject_folder)
-
-    # Create preprocessed directory
-    os.makedirs(preprocessed_dir, exist_ok=True)
-
-    # Get all JSON files in the raw_data directory and its subdirectories
-    json_files = []
-    for root, _, files in os.walk(raw_data_dir):
-        for file in files:
-            if file.endswith('.json'):
-                json_files.append(os.path.join(root, file))
-
-    total_files = len(json_files)
-    logging.info(f'Found {total_files} JSON files to process')
-
-    # Task name mapping for pretouch files
-    pretouch_task_mapping = {
+    # Task name mapping
+    task_mapping = {
         # AX-CPT variations
         'ax_cpt_rdoc': 'axCPT',
         'ax_cpt': 'axCPT',
@@ -334,7 +333,7 @@ def main():
         'OpSpan': 'opSpan',
         
         # Operation Only variations
-        'operation_only_span_rdoc': 'opOnly',
+        'operation_only_rdoc': 'opOnly',
         'operation_only': 'opOnly',
         'opOnly': 'opOnly',
         
@@ -355,140 +354,120 @@ def main():
         'visual': 'visualSearch'
     }
 
-    for index, filepath in enumerate(json_files, start=1):
-        logging.info(f'Processing file {index} of {total_files}: {filepath}')
-
-        filename = os.path.basename(filepath)
-        parts = filename.split('_')
-        task_name = None
-        task_parts = []
-        found_task = False
-        for part in parts:
-            if part.startswith('task-'):
-                found_task = True
-                task_parts.append(part[5:])  # Remove 'task-' prefix
-            elif found_task and not part.startswith(('ses-', 'run-', 'fmri', 'dateTime')):
-                task_parts.append(part)
-            elif found_task and (part.startswith(('ses-', 'run-', 'fmri', 'dateTime')) or part == 'practice'):
-                break
-        
-        if task_parts:
-            task_name = '_'.join(task_parts)
+    # Determine subfolder name
+    subfolder_name = None
+    if 'pretouch' in filename.lower() or 'practice' in filename.lower():
+        # Handle practice files
+        task_name_lower = task_name.lower()
+        if task_name in task_mapping:
+            subfolder_name = task_mapping[task_name] + "_practice"
+        elif task_name_lower in task_mapping:
+            subfolder_name = task_mapping[task_name_lower] + "_practice"
         else:
-            logging.error(f'Could not extract task name from {filepath}')
-            continue
-
-        # Load the JSON data
-        try:
-            with open(filepath, 'r') as f:
-                data = json.load(f)
-        except Exception as e:
-            logging.error(f'Error loading {filepath}: {str(e)}')
-            continue
-
-        # Special check for pretouch files
-        subfolder_name = None
-        if 'pretouch' in filename.lower() or 'practice' in filename.lower():
-            # Handle case where data is already a list of trial data
-            if isinstance(data, list):
-                exp_id = ''
+            task_name_with_rdoc = task_name_lower + '_rdoc'
+            if task_name_with_rdoc in task_mapping:
+                subfolder_name = task_mapping[task_name_with_rdoc] + "_practice"
             else:
-                exp_id = data.get('exp_id', '')
-            # Check if task name is a substring of exp_id or vice versa
-            if exp_id and task_name and not (task_name in exp_id or exp_id in task_name):
-                logging.error(f"exp_id '{exp_id}' does not match extracted task name '{task_name}' in {filepath}. Skipping.")
-                continue
-            # Use mapping for pretouch files
+                for key, mapped_name in task_mapping.items():
+                    if key in task_name_lower:
+                        subfolder_name = mapped_name + "_practice"
+                        break
+    else:
+        # Handle non-practice files
+        if task_name in task_mapping:
+            subfolder_name = task_mapping[task_name]
+        else:
             task_name_lower = task_name.lower()
-            # First try exact match
-            if task_name in pretouch_task_mapping:
-                subfolder_name = pretouch_task_mapping[task_name] + "_practice"
-            elif task_name_lower in pretouch_task_mapping:
-                subfolder_name = pretouch_task_mapping[task_name_lower] + "_practice"
+            if task_name_lower in task_mapping:
+                subfolder_name = task_mapping[task_name_lower]
             else:
-                # Then try matching with _rdoc suffix
                 task_name_with_rdoc = task_name_lower + '_rdoc'
-                if task_name_with_rdoc in pretouch_task_mapping:
-                    subfolder_name = pretouch_task_mapping[task_name_with_rdoc] + "_practice"
+                if task_name_with_rdoc in task_mapping:
+                    subfolder_name = task_mapping[task_name_with_rdoc]
                 else:
-                    # Finally try partial match as fallback
-                    for key, mapped_name in pretouch_task_mapping.items():
+                    for key, mapped_name in task_mapping.items():
                         if key in task_name_lower:
-                            subfolder_name = mapped_name + "_practice"
+                            subfolder_name = mapped_name
                             break
-        else:
-            # For non-practice files, use the mapping without _practice suffix
-            if task_name in pretouch_task_mapping:
-                subfolder_name = pretouch_task_mapping[task_name]
-            else:
-                task_name_lower = task_name.lower()
-                if task_name_lower in pretouch_task_mapping:
-                    subfolder_name = pretouch_task_mapping[task_name_lower]
-                else:
-                    task_name_with_rdoc = task_name_lower + '_rdoc'
-                    if task_name_with_rdoc in pretouch_task_mapping:
-                        subfolder_name = pretouch_task_mapping[task_name_with_rdoc]
-                    else:
-                        for key, mapped_name in pretouch_task_mapping.items():
-                            if key in task_name_lower:
-                                subfolder_name = mapped_name
-                                break
 
-        if subfolder_name is None:
-            logging.error(f'Could not determine subfolder name for {filepath}')
-            continue
+    if subfolder_name is None:
+        logging.error(f'Could not determine subfolder name for {filepath}')
+        return
 
-        # Create output directory structure
-        task_dir = os.path.join(preprocessed_dir, subfolder_name)
-        os.makedirs(task_dir, exist_ok=True)
+    # Create output directory structure
+    task_dir = os.path.join(output_dir, subfolder_name)
+    os.makedirs(task_dir, exist_ok=True)
 
-        # Create output filename
-        # Extract run number if present
-        run_num = None
-        for part in parts:
-            if part.startswith('run-'):
-                run_num = part[4:]
-                break
+    # Create output filename
+    run_num = None
+    for part in parts:
+        if part.startswith('run-'):
+            run_num = part[4:]
+            break
+    
+    if run_num:
+        outname = f'{os.path.basename(output_dir)}_task-{task_name}_run-{run_num}.parquet'
+    else:
+        outname = f'{os.path.basename(output_dir)}_task-{task_name}.parquet'
         
-        # Create a cleaner output filename
-        if run_num:
-            outname = f'{subject_folder}_task-{task_name}_run-{run_num}.parquet'
-        else:
-            outname = f'{subject_folder}_task-{task_name}.parquet'
-            
-        outpath = os.path.join(task_dir, outname)
+    outpath = os.path.join(task_dir, outname)
 
-        # Skip if file already exists
-        if os.path.isfile(outpath):
-            logging.info(f'Skipping {outpath} because it already exists')
-            continue
+    # Skip if file already exists
+    if os.path.isfile(outpath):
+        logging.info(f'Skipping {outpath} because it already exists')
+        return
 
-        try:
-            # Process the JSON data
-            df = get_trialdata_df(data)
-            
-            # Different validation for practice vs non-practice tasks
-            if 'pretouch' in filename.lower() or 'practice' in filename.lower():
-                # For practice tasks, verify task name matches exp_id
-                if isinstance(data, list):
-                    exp_id = ''
-                else:
-                    exp_id = data.get('exp_id', '')
-                if exp_id and task_name and not (task_name in exp_id or exp_id in task_name):
-                    logging.error(f"Skipping {filepath} because exp_id '{exp_id}' does not match task name '{task_name}'")
-                    continue
-            else:
-                # For non-practice tasks, verify required columns
-                if not validate_columns(df, subfolder_name):
-                    logging.error(f'Skipping {filepath} due to missing required columns')
-                    continue
-            
-            # Save as parquet
-            df.write_parquet(outpath)
-            logging.info(f'Saved preprocessed data to {outpath}')
-        except Exception as e:
-            logging.error(f'Error processing {filepath}: {str(e)}')
-            continue
+    try:
+        # Load and process the JSON data
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        
+        df = get_trialdata_df(data)
+        
+        # Validate columns for non-practice tasks
+        if not ('pretouch' in filename.lower() or 'practice' in filename.lower()):
+            if not validate_columns(df, subfolder_name):
+                logging.error(f'Skipping {filepath} due to missing required columns')
+                return
+        
+        # Save as parquet
+        df.write_parquet(outpath)
+        logging.info(f'Saved preprocessed data to {outpath}')
+    except Exception as e:
+        logging.error(f'Error processing {filepath}: {str(e)}')
+
+
+def main():
+    # Configure logging
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
+    if len(sys.argv) == 2:
+        # Single subject mode
+        subject_folders = [sys.argv[1]]
+    elif len(sys.argv) == 1:
+        # All subjects mode
+        raw_dir = os.path.join('output', 'raw')
+        subject_folders = [f for f in os.listdir(raw_dir)
+                           if os.path.isdir(os.path.join(raw_dir, f)) and f.startswith('sub-')]
+        if not subject_folders:
+            print(f"No subject folders found in {raw_dir}")
+            sys.exit(1)
+        print(f"Processing all subjects: {', '.join(subject_folders)}")
+    else:
+        print("Usage: python preprocess.py <subject_folder>")
+        print("Example: python preprocess.py sub-sM")
+        print("Or run without arguments to process all subjects.")
+        sys.exit(1)
+
+    for subject_folder in subject_folders:
+        input_dir = os.path.join('output', 'raw', subject_folder)
+        output_dir = os.path.join('preprocessed_data', subject_folder)
+        os.makedirs(output_dir, exist_ok=True)
+        for root, dirs, files in os.walk(input_dir):
+            for file in files:
+                if file.endswith('.json'):
+                    input_file = os.path.join(root, file)
+                    process_file(input_file, output_dir)
 
 
 if __name__ == '__main__':
