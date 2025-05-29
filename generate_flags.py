@@ -40,6 +40,9 @@ TASK_NAME_MAP = {
 
 # Map metric names to their corresponding threshold variables
 METRIC_TO_THRESHOLD = {
+    # General metrics
+    'proportion_feedback': 'PROPORTION_FEEDBACK_THRESHOLD',
+    
     # Stop Signal
     'stop_signal_go_accuracy': 'STOP_SIGNAL_GO_ACCURACY',
     'stop_signal_go_rt': 'STOP_SIGNAL_GO_RT',
@@ -79,6 +82,10 @@ METRIC_TO_THRESHOLD = {
     # N-Back
     'weighted_2back_accuracy': 'NBACK_WEIGHTED_2BACK_ACCURACY',
     'weighted_1back_accuracy': 'NBACK_WEIGHTED_1BACK_ACCURACY',
+    'match_1_omission_rate': 'NBACK_OMISSION_RATE',
+    'match_2_omission_rate': 'NBACK_OMISSION_RATE',
+    'mismatch_1_omission_rate': 'NBACK_OMISSION_RATE',
+    'mismatch_2_omission_rate': 'NBACK_OMISSION_RATE',
     
     # Cued TS
     'switch_stay_accuracy': 'CUED_TS_SWITCH_STAY_ACCURACY',
@@ -179,6 +186,11 @@ def check_thresholds_from_csv(task_metrics_df: pl.DataFrame, task_name: str) -> 
                             violations.append((metric, value, min_threshold))
                         elif value > max_threshold:
                             violations.append((metric, value, max_threshold))
+                # Special case for proportion_feedback
+                elif metric == 'proportion_feedback':
+                    threshold = THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']
+                    if value is not None and value > threshold:
+                        violations.append((metric, value, threshold))
                 # For RT metrics, flag if value is ABOVE threshold (too slow)
                 elif 'rt' in metric.lower():
                     if value is not None and value > threshold:
@@ -266,7 +278,11 @@ def get_all_metrics_and_thresholds(task_name: str) -> List[Tuple[str, float]]:
             ('match_2_accuracy', THRESHOLDS['NBACK_MATCH_MIN_CONDITIONAL_ACCURACY']),
             ('mismatch_2_accuracy', THRESHOLDS['NBACK_MISMATCH_MIN_CONDITIONAL_ACCURACY']),
             ('match_1_accuracy', THRESHOLDS['NBACK_MATCH_MIN_CONDITIONAL_ACCURACY']),
-            ('mismatch_1_accuracy', THRESHOLDS['NBACK_MISMATCH_MIN_CONDITIONAL_ACCURACY'])
+            ('mismatch_1_accuracy', THRESHOLDS['NBACK_MISMATCH_MIN_CONDITIONAL_ACCURACY']),
+            ('match_2_omission_rate', THRESHOLDS['NBACK_OMISSION_RATE']),
+            ('mismatch_2_omission_rate', THRESHOLDS['NBACK_OMISSION_RATE']),
+            ('match_1_omission_rate', THRESHOLDS['NBACK_OMISSION_RATE']),
+            ('mismatch_1_omission_rate', THRESHOLDS['NBACK_OMISSION_RATE'])
         ])
     elif task_name == 'stop_signal':
         metrics_thresholds.extend([
