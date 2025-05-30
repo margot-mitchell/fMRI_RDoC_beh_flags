@@ -36,6 +36,7 @@ preprocessed_data/
 outputs/
 logs/
 *.log
+rclone.conf
 
 # OS specific
 .DS_Store
