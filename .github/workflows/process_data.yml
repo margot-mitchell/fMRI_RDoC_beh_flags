@@ -1,189 +1,68 @@
-name: Process Dropbox Data
+name: Process Data
 
 on:
-  workflow_dispatch: # Manual trigger
-  schedule:
-    - cron: '0 0 * * 1' # Run weekly on Mondays at midnight
-  push: # Trigger on git pushes
+  workflow_dispatch:
+    inputs:
+      subject_folder:
+        description: 'Subject folder to process (e.g., sub-sM)'
+        required: true
+        type: string
 
 jobs:
   process-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # Set a 2-hour timeout
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone --version
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Install uv
-        run: |
-          echo "Installing uv..."
-          python -m pip install --upgrade pip
-          python -m pip install uv
-          echo "uv version:"
-          uv --version
-
-      - name: Create venv with uv
+          cache: 'pip'
+          
+      - name: Create virtual environment
         run: |
           echo "Creating virtual environment..."
-          uv venv
-          echo "Virtual environment created at:"
-          ls -la .venv/bin/
-
-      - name: Install dependencies
-        run: |
+          python -m venv .venv
           echo "Activating virtual environment..."
           source .venv/bin/activate
           echo "Python path:"
           which python
           echo "Installing pip in virtual environment..."
-          curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-          python get-pip.py
+          curl -sS https://bootstrap.pypa.io/get-pip.py | python
           echo "Installing requirements..."
-          python -m pip install -r requirements.txt
-          echo "Installing package in editable mode..."
-          pip install -e . || {
-            echo "Error: Failed to install package"
-            exit 1
-          }
-          echo "Installed packages:"
-          pip list
-
-      - name: Setup Rclone
-        uses: AnimMouse/setup-rclone@v1
-        with:
-          rclone_config: ${{ secrets.RCLONE_CONFIG }}
-
-      - name: Create directory structure
+          pip install -r requirements.txt
+          
+      - name: Configure rclone
         run: |
-          echo "Creating directories with proper permissions..."
-          mkdir -p preprocessed_data
-          mkdir -p output
-          mkdir -p raw_data
-          mkdir -p results/metrics
-          chmod -R 755 preprocessed_data output raw_data results
-
-      - name: Verify Dropbox connection
-        run: |
-          echo "Verifying Dropbox connection..."
-          rclone lsd rdoc_dropbox:rdoc_fmri_behavior/output/raw || {
-            echo "Error: Could not access Dropbox directory"
-            exit 1
-          }
-
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+          
       - name: Sync data from Dropbox
         run: |
+          source .venv/bin/activate
           echo "Syncing data from Dropbox..."
-          rclone copy rdoc_dropbox:rdoc_fmri_behavior/output/raw ./raw_data --verbose || {
-            echo "Error: Failed to sync data from Dropbox"
-            exit 1
-          }
-
-      - name: Verify raw data
+          rclone sync dropbox:raw_data/ raw_data/ --progress
+          
+      - name: Process data
         run: |
-          echo "Verifying raw data..."
-          if [ ! "$(ls -A ./raw_data)" ]; then
-            echo "Error: No raw data found"
-            exit 1
-          fi
-          echo "Found raw data:"
-          ls -R ./raw_data
-
-      - name: Process each subject
-        run: |
-          # Activate virtual environment
           source .venv/bin/activate
+          echo "Processing data..."
+          python preprocess.py ${{ github.event.inputs.subject_folder }}
+          python calculate_metrics.py ${{ github.event.inputs.subject_folder }}
+          python generate_flags.py ${{ github.event.inputs.subject_folder }}
           
-          # Get list of subject folders
-          subject_folders=$(find ./raw_data -maxdepth 1 -type d -name "sub-*")
-          if [ -z "$subject_folders" ]; then
-            echo "Error: No subject folders found"
-            exit 1
-          fi
-          
-          for subject in $subject_folders; do
-            subject_name=$(basename "$subject")
-            echo "Processing $subject_name..."
-            
-            # Run preprocessing with memory limit
-            echo "Running preprocessing for $subject_name..."
-            python -X maxmemory=4G preprocess.py "$subject_name" || {
-              echo "Error: Preprocessing failed for $subject_name"
-              exit 1
-            }
-            
-            # Verify preprocessed data
-            if [ ! -d "preprocessed_data/$subject_name" ]; then
-              echo "Error: No preprocessed data found for $subject_name"
-              exit 1
-            fi
-            
-            # Run metrics calculation with memory limit
-            echo "Running metrics calculation for $subject_name..."
-            python -X maxmemory=4G calculate_metrics.py "$subject_name" || {
-              echo "Error: Metrics calculation failed for $subject_name"
-              exit 1
-            }
-            
-            # Verify metrics
-            if [ ! -d "results/metrics/$subject_name" ]; then
-              echo "Error: No metrics found for $subject_name"
-              exit 1
-            fi
-            
-            # Run flag generation with memory limit
-            echo "Running flag generation for $subject_name..."
-            python -X maxmemory=4G generate_flags.py "$subject_name" || {
-              echo "Error: Flag generation failed for $subject_name"
-              exit 1
-            }
-            
-            echo "Successfully processed $subject_name"
-          done
-
-      - name: Upload processed data to Dropbox
-        run: |
-          # Activate virtual environment
-          source .venv/bin/activate
-          
-          # Create a timestamp for the archive
-          timestamp=$(date +%Y%m%d_%H%M%S)
-          
-          echo "Creating output directories in Dropbox..."
-          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data || echo "Warning: Could not create preprocessed_data directory"
-          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/output || echo "Warning: Could not create output directory"
-          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp} || echo "Warning: Could not create archive directory"
-          
-          echo "Uploading preprocessed data..."
-          rclone copy ./preprocessed_data rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data --verbose || {
-            echo "Error: Failed to upload preprocessed data"
-            exit 1
-          }
-          
-          echo "Uploading analysis outputs..."
-          rclone copy ./output rdoc_dropbox:rdoc_fmri_behavior/output/output --verbose || {
-            echo "Error: Failed to upload analysis outputs"
-            exit 1
-          }
-          
-          echo "Uploading metrics..."
-          rclone copy ./results/metrics rdoc_dropbox:rdoc_fmri_behavior/output/metrics --verbose || {
-            echo "Error: Failed to upload metrics"
-            exit 1
-          }
-          
-          echo "Archiving raw data..."
-          rclone copy ./raw_data rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp} --verbose || {
-            echo "Error: Failed to archive raw data"
-            exit 1
-          }
-
-      - name: Clean up
-        if: always()
-        run: |
-          rm -rf ./raw_data
-          echo "Temporary data cleaned up" 
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: processed-data
+          path: |
+            results/
+            preprocessed_data/
+          if-no-files-found: error 
