@@ -71,6 +71,16 @@ jobs:
           }
           echo "Successfully connected to Dropbox"
           
+      - name: Create directory structure
+        run: |
+          echo "Creating required directories..."
+          mkdir -p preprocessed_data
+          mkdir -p raw_data
+          mkdir -p results/metrics
+          mkdir -p output
+          echo "Directory structure created:"
+          tree -L 2
+          
       - name: Sync data from Dropbox
         run: |
           source .venv/bin/activate
