@@ -7,6 +7,15 @@ on:
         description: 'Subject folder to process (e.g., sub-sM)'
         required: true
         type: string
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/process_data.yml'
+      - 'requirements.txt'
+      - 'preprocess.py'
+      - 'calculate_metrics.py'
+      - 'generate_flags.py'
 
 jobs:
   process-data:
@@ -54,9 +63,18 @@ jobs:
         run: |
           source .venv/bin/activate
           echo "Processing data..."
-          python preprocess.py ${{ github.event.inputs.subject_folder }}
-          python calculate_metrics.py ${{ github.event.inputs.subject_folder }}
-          python generate_flags.py ${{ github.event.inputs.subject_folder }}
+          # For push events, process all subjects
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Processing all subjects..."
+            python preprocess.py
+            python calculate_metrics.py
+            python generate_flags.py
+          else
+            # For manual triggers, process specific subject
+            python preprocess.py ${{ github.event.inputs.subject_folder }}
+            python calculate_metrics.py ${{ github.event.inputs.subject_folder }}
+            python generate_flags.py ${{ github.event.inputs.subject_folder }}
+          fi
           
       - name: Upload results
         uses: actions/upload-artifact@v4
