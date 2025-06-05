@@ -74,10 +74,9 @@ jobs:
       - name: Create directory structure
         run: |
           echo "Creating required directories..."
+          mkdir -p output/raw
           mkdir -p preprocessed_data
-          mkdir -p raw_data
           mkdir -p results/metrics
-          mkdir -p output
           echo "Directory structure created:"
           tree -L 2
           
@@ -85,7 +84,7 @@ jobs:
         run: |
           source .venv/bin/activate
           echo "Syncing data from Dropbox..."
-          rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ raw_data/ --progress
+          rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
           
       - name: Process data
         run: |
