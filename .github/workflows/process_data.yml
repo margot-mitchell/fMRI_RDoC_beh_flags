@@ -52,12 +52,14 @@ jobs:
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
           chmod 600 ~/.config/rclone/rclone.conf
+          echo "Verifying rclone configuration..."
+          rclone listremotes
           
       - name: Sync data from Dropbox
         run: |
           source .venv/bin/activate
           echo "Syncing data from Dropbox..."
-          rclone sync dropbox:raw_data/ raw_data/ --progress
+          rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ raw_data/ --progress
           
       - name: Process data
         run: |
