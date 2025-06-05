@@ -49,11 +49,27 @@ jobs:
           
       - name: Configure rclone
         run: |
+          echo "Setting up rclone configuration..."
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
           chmod 600 ~/.config/rclone/rclone.conf
+          
           echo "Verifying rclone configuration..."
+          echo "Configuration file exists:"
+          ls -l ~/.config/rclone/rclone.conf
+          echo "Configuration file contents (without sensitive data):"
+          grep -v "token" ~/.config/rclone/rclone.conf
+          echo "Available remotes:"
           rclone listremotes
+          
+      - name: Test Dropbox connection
+        run: |
+          echo "Testing Dropbox connection..."
+          rclone lsd rdoc_dropbox: || {
+            echo "Error: Could not list Dropbox root directory"
+            exit 1
+          }
+          echo "Successfully connected to Dropbox"
           
       - name: Sync data from Dropbox
         run: |
