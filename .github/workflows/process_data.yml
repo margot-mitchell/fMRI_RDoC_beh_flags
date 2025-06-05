@@ -9,6 +9,7 @@ on:
 jobs:
   process-data:
     runs-on: ubuntu-latest
+    timeout-minutes: 120  # Set a 2-hour timeout
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -45,7 +46,10 @@ jobs:
           echo "Installing requirements..."
           python -m pip install -r requirements.txt
           echo "Installing package in editable mode..."
-          pip install -e .
+          pip install -e . || {
+            echo "Error: Failed to install package"
+            exit 1
+          }
           echo "Installed packages:"
           pip list
 
@@ -56,14 +60,38 @@ jobs:
 
       - name: Create directory structure
         run: |
+          echo "Creating directories with proper permissions..."
           mkdir -p preprocessed_data
-          mkdir -p outputs
+          mkdir -p output
           mkdir -p raw_data
+          mkdir -p results/metrics
+          chmod -R 755 preprocessed_data output raw_data results
+
+      - name: Verify Dropbox connection
+        run: |
+          echo "Verifying Dropbox connection..."
+          rclone lsd rdoc_dropbox:rdoc_fmri_behavior/output/raw || {
+            echo "Error: Could not access Dropbox directory"
+            exit 1
+          }
 
       - name: Sync data from Dropbox
         run: |
           echo "Syncing data from Dropbox..."
-          rclone copy rdoc_dropbox:rdoc_fmri_behavior/output/raw ./raw_data --verbose
+          rclone copy rdoc_dropbox:rdoc_fmri_behavior/output/raw ./raw_data --verbose || {
+            echo "Error: Failed to sync data from Dropbox"
+            exit 1
+          }
+
+      - name: Verify raw data
+        run: |
+          echo "Verifying raw data..."
+          if [ ! "$(ls -A ./raw_data)" ]; then
+            echo "Error: No raw data found"
+            exit 1
+          fi
+          echo "Found raw data:"
+          ls -R ./raw_data
 
       - name: Process each subject
         run: |
@@ -71,34 +99,50 @@ jobs:
           source .venv/bin/activate
           
           # Get list of subject folders
-          for subject in ./raw_data/sub-*; do
-            if [ -d "$subject" ]; then
-              subject_name=$(basename "$subject")
-              echo "Processing $subject_name..."
-              
-              # Run preprocessing
-              echo "Running preprocessing for $subject_name..."
-              python preprocess.py "$subject_name" || {
-                echo "Error: Preprocessing failed for $subject_name"
-                exit 1
-              }
-              
-              # Run metrics calculation
-              echo "Running metrics calculation for $subject_name..."
-              python calculate_metrics.py "$subject_name" || {
-                echo "Error: Metrics calculation failed for $subject_name"
-                exit 1
-              }
-              
-              # Run analysis
-              echo "Running analysis for $subject_name..."
-              python analyze_metrics.py "$subject_name" || {
-                echo "Error: Analysis failed for $subject_name"
-                exit 1
-              }
-              
-              echo "Successfully processed $subject_name"
+          subject_folders=$(find ./raw_data -maxdepth 1 -type d -name "sub-*")
+          if [ -z "$subject_folders" ]; then
+            echo "Error: No subject folders found"
+            exit 1
+          fi
+          
+          for subject in $subject_folders; do
+            subject_name=$(basename "$subject")
+            echo "Processing $subject_name..."
+            
+            # Run preprocessing with memory limit
+            echo "Running preprocessing for $subject_name..."
+            python -X maxmemory=4G preprocess.py "$subject_name" || {
+              echo "Error: Preprocessing failed for $subject_name"
+              exit 1
+            }
+            
+            # Verify preprocessed data
+            if [ ! -d "preprocessed_data/$subject_name" ]; then
+              echo "Error: No preprocessed data found for $subject_name"
+              exit 1
             fi
+            
+            # Run metrics calculation with memory limit
+            echo "Running metrics calculation for $subject_name..."
+            python -X maxmemory=4G calculate_metrics.py "$subject_name" || {
+              echo "Error: Metrics calculation failed for $subject_name"
+              exit 1
+            }
+            
+            # Verify metrics
+            if [ ! -d "results/metrics/$subject_name" ]; then
+              echo "Error: No metrics found for $subject_name"
+              exit 1
+            fi
+            
+            # Run flag generation with memory limit
+            echo "Running flag generation for $subject_name..."
+            python -X maxmemory=4G generate_flags.py "$subject_name" || {
+              echo "Error: Flag generation failed for $subject_name"
+              exit 1
+            }
+            
+            echo "Successfully processed $subject_name"
           done
 
       - name: Upload processed data to Dropbox
@@ -111,7 +155,7 @@ jobs:
           
           echo "Creating output directories in Dropbox..."
           rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/preprocessed_data || echo "Warning: Could not create preprocessed_data directory"
-          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs || echo "Warning: Could not create analysis_outputs directory"
+          rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/output || echo "Warning: Could not create output directory"
           rclone mkdir rdoc_dropbox:rdoc_fmri_behavior/output/archive/raw_${timestamp} || echo "Warning: Could not create archive directory"
           
           echo "Uploading preprocessed data..."
@@ -121,8 +165,14 @@ jobs:
           }
           
           echo "Uploading analysis outputs..."
-          rclone copy ./outputs rdoc_dropbox:rdoc_fmri_behavior/output/analysis_outputs --verbose || {
+          rclone copy ./output rdoc_dropbox:rdoc_fmri_behavior/output/output --verbose || {
             echo "Error: Failed to upload analysis outputs"
+            exit 1
+          }
+          
+          echo "Uploading metrics..."
+          rclone copy ./results/metrics rdoc_dropbox:rdoc_fmri_behavior/output/metrics --verbose || {
+            echo "Error: Failed to upload metrics"
             exit 1
           }
           
