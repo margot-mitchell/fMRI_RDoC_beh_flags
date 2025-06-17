@@ -286,6 +286,9 @@ def get_all_metrics_and_thresholds(task_name: str) -> List[Tuple[str, float]]:
     """
     metrics_thresholds = []
     
+    # Add proportion_feedback for all tasks
+    metrics_thresholds.append(('proportion_feedback', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    
     if task_name == 'nback':
         metrics_thresholds.extend([
             ('match_2_accuracy', THRESHOLDS['NBACK_MATCH_MIN_CONDITIONAL_ACCURACY']),
@@ -427,6 +430,9 @@ def main():
             
         metrics_files = [f for f in os.listdir(metrics_dir) if f.endswith('_metrics.csv')]
         logger.info(f"Found {len(metrics_files)} metrics files: {metrics_files}")
+        
+        # Filter out practice and pretouch files before any processing
+        metrics_files = [f for f in metrics_files if 'practice' not in f and 'pretouch' not in f]
         
         all_flags = []
         all_metrics = []
