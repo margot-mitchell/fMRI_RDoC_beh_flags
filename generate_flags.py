@@ -47,8 +47,7 @@ TASK_NAME_MAP = {
     'stroop_practice': 'stroop',
     'visualSearch': 'visual_search',
     'visualSearch_practice': 'visual_search',
-    'flanker': 'flanker',
-    'flanker_practice': 'flanker'
+    'flanker': 'flanker'
 }
 
 # Map metric names to their corresponding threshold variables
@@ -77,6 +76,7 @@ METRIC_TO_THRESHOLD = {
     'gonogo_nogo_accuracy': 'GONOGO_NOGO_ACCURACY_MIN',
     'gonogo_mean_accuracy': 'GONOGO_MEAN_ACCURACY',
     'gonogo_go_omission_rate': 'GONOGO_GO_OMISSION_RATE',
+    'gonogo_go_rt': 'RT_THRESHOLD',
     
     # Operation Span
     '8x8_grid_asymmetric_accuracy': 'OP_SPAN_ASYMMETRIC_ACCURACY',
@@ -173,11 +173,15 @@ def check_thresholds_from_csv(task_metrics_df: pl.DataFrame, task_name: str) -> 
     metrics_dict = dict(zip(task_metrics_df['metric'], task_metrics_df['value']))
     
     for metric, value in metrics_dict.items():
-        # Create task-specific metric name
-        task_specific_metric = f"{task_name}_{metric}"
+        # Rename metrics to be task-specific for consistent mapping
+        if metric == 'go_rt':
+            if task_name == 'stop_signal':
+                metric = 'stop_signal_go_rt'
+            elif task_name == 'gonogo':
+                metric = 'gonogo_go_rt'
         
         # Try to find a threshold variable for this metric
-        threshold_var = METRIC_TO_THRESHOLD.get(task_specific_metric)
+        threshold_var = METRIC_TO_THRESHOLD.get(metric)
         if not threshold_var:
             # Try to construct a threshold variable name from the metric and task
             # e.g., for 'go_accuracy' in stop_signal, try 'STOP_SIGNAL_GO_ACCURACY'
@@ -216,6 +220,13 @@ def check_thresholds_from_csv(task_metrics_df: pl.DataFrame, task_name: str) -> 
                 elif value is not None:
                     if value < threshold:
                         violations.append((metric, value, threshold))
+        else:
+            # If no specific threshold found, check for general thresholds
+            if 'rt' in metric.lower():
+                # Use general RT threshold for any RT metric without a specific threshold
+                general_rt_threshold = THRESHOLDS['RT_THRESHOLD']
+                if value is not None and value > general_rt_threshold:
+                    violations.append((metric, value, general_rt_threshold))
     
     return violations
 
@@ -289,6 +300,9 @@ def get_all_metrics_and_thresholds(task_name: str) -> List[Tuple[str, float]]:
     # Add proportion_feedback for all tasks
     metrics_thresholds.append(('proportion_feedback', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
     
+    # Note: RT metrics will be added dynamically when found in the actual data
+    # The general RT_THRESHOLD will be applied to all metrics with "rt" in their name
+    
     if task_name == 'nback':
         metrics_thresholds.extend([
             ('match_2_accuracy', THRESHOLDS['NBACK_MATCH_MIN_CONDITIONAL_ACCURACY']),
@@ -305,8 +319,8 @@ def get_all_metrics_and_thresholds(task_name: str) -> List[Tuple[str, float]]:
             ('stop_accuracy', THRESHOLDS['STOP_SIGNAL_STOP_ACCURACY_MIN']),
             ('stop_accuracy', THRESHOLDS['STOP_SIGNAL_STOP_ACCURACY_MAX']),
             ('go_accuracy', THRESHOLDS['STOP_SIGNAL_GO_ACCURACY']),
-            ('go_rt', THRESHOLDS['STOP_SIGNAL_GO_RT']),
-            ('go_omission_rate', THRESHOLDS['STOP_SIGNAL_OMISSION_RATE'])
+            ('go_omission_rate', THRESHOLDS['STOP_SIGNAL_OMISSION_RATE']),
+            ('stop_signal_go_rt', THRESHOLDS['STOP_SIGNAL_GO_RT'])
         ])
     elif task_name == 'ax_cpt':
         for condition in ['AX', 'BX', 'AY', 'BY']:
@@ -485,6 +499,20 @@ def main():
                                 logger.debug(f"Added metric: {task_name} - {metric_name} = {value} (threshold: {threshold})")
                     else:
                         logger.warning(f"Metric {metric_name} not found in {metrics_file}")
+            
+            # Dynamically find RT metrics in the actual data and add them with general RT threshold
+            for metric_name in task_metrics_df['metric']:
+                if 'rt' in metric_name.lower() and metric_name not in raw_metrics:
+                    filtered_df = task_metrics_df.filter(pl.col('metric') == metric_name)
+                    if len(filtered_df) > 0:
+                        if len(filtered_df) > 1:
+                            value = filtered_df['value'].mean()
+                        else:
+                            value = filtered_df['value'].item()
+                        
+                        if pd.notna(value):
+                            all_metrics.append((task_name, metric_name, value, THRESHOLDS['RT_THRESHOLD']))
+                            logger.debug(f"Added RT metric: {task_name} - {metric_name} = {value} (threshold: {THRESHOLDS['RT_THRESHOLD']})")
             
             # Calculate Go/NoGo specific metrics if this is a Go/NoGo task
             if task_name == 'gonogo':

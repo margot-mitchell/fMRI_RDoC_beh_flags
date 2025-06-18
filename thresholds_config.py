@@ -7,10 +7,8 @@ by generate_flags.py to generate quality control flags.
 
 # General thresholds
 PROPORTION_FEEDBACK_THRESHOLD = 0.2  
+RT_THRESHOLD = 1000  
 
-# Remove general thresholds
-# ACCURACY_THRESHOLD = 0.55
-# OMISSION_THRESHOLD = 0.5
 
 # Stop Signal thresholds
 STOP_SIGNAL_GO_ACCURACY = 0.75   
@@ -63,7 +61,6 @@ NBACK_MISMATCH_WEIGHT = 0.8
 ## Conditional accuracy threshold: if mismatch is >80% AND match >20% (in either 2-back or 1-back), flag
 NBACK_MISMATCH_MIN_CONDITIONAL_ACCURACY = 0.8
 NBACK_MATCH_MIN_CONDITIONAL_ACCURACY = 0.2
-## Omission rate threshold for n-back conditions
 NBACK_OMISSION_RATE = 0.05  
 
 # Cued TS thresholds

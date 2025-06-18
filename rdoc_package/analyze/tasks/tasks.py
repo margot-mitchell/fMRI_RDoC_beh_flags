@@ -691,7 +691,7 @@ def go_nogo_rdoc(df: pl.DataFrame) -> pl.DataFrame:
         'metric': [
             'go_accuracy',
             'go_omission_rate',
-            'go_rt',
+            'gonogo_go_rt',
             'nogo_accuracy',
             'nogo_rt',
             'proportion_feedback'
@@ -1266,7 +1266,7 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
         'metric': [
             'go_accuracy',
             'go_omission_rate',
-            'go_rt',
+            'stop_signal_go_rt',
             'stop_accuracy',
             'stop_omission_rate',
             'min_SSD',
