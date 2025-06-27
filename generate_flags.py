@@ -323,11 +323,16 @@ def get_all_metrics_and_thresholds(task_name: str) -> List[Tuple[str, float]]:
             ('stop_signal_go_rt', THRESHOLDS['STOP_SIGNAL_GO_RT'])
         ])
     elif task_name == 'ax_cpt':
-        for condition in ['AX', 'BX', 'AY', 'BY']:
-            metrics_thresholds.extend([
-                (f'{condition}_accuracy', THRESHOLDS['AX_CPT_AX_ACCURACY']),
-                (f'{condition}_omission_rate', THRESHOLDS['AX_CPT_AX_OMISSION_RATE'])
-            ])
+        metrics_thresholds.extend([
+            ('AX_accuracy', THRESHOLDS['AX_CPT_AX_ACCURACY']),
+            ('AX_omission_rate', THRESHOLDS['AX_CPT_AX_OMISSION_RATE']),
+            ('BX_accuracy', THRESHOLDS['AX_CPT_BX_ACCURACY']),
+            ('BX_omission_rate', THRESHOLDS['AX_CPT_BX_OMISSION_RATE']),
+            ('AY_accuracy', THRESHOLDS['AX_CPT_AY_ACCURACY']),
+            ('AY_omission_rate', THRESHOLDS['AX_CPT_AY_OMISSION_RATE']),
+            ('BY_accuracy', THRESHOLDS['AX_CPT_BY_ACCURACY']),
+            ('BY_omission_rate', THRESHOLDS['AX_CPT_BY_OMISSION_RATE'])
+        ])
     elif task_name == 'gonogo':
         metrics_thresholds.extend([
             ('go_accuracy', THRESHOLDS['GONOGO_GO_ACCURACY_MIN']),

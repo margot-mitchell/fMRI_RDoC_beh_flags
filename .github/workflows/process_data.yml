@@ -7,6 +7,11 @@ on:
         description: 'Subject folder to process (e.g., sub-sM)'
         required: true
         type: string
+      process_all:
+        description: 'Process all subjects in parallel'
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -18,8 +23,55 @@ on:
       - 'generate_flags.py'
 
 jobs:
-  process-data:
+  get-subjects:
     runs-on: ubuntu-latest
+    outputs:
+      subjects: ${{ steps.get-subjects.outputs.subjects }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone --version
+      
+      - name: Configure rclone
+        run: |
+          echo "Setting up rclone configuration..."
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG }}" | base64 -d > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+          
+      - name: Sync data from Dropbox
+        run: |
+          echo "Syncing data from Dropbox to get subject list..."
+          mkdir -p output/raw
+          rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
+          
+      - name: Get subject list
+        id: get-subjects
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.process_all }}" = "true" ]; then
+            # Get all subjects for parallel processing
+            subjects=$(find output/raw -maxdepth 1 -type d -name "sub-*" -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
+            echo "subjects=$subjects" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Single subject mode
+            echo "subjects=[\"${{ github.event.inputs.subject_folder }}\"]" >> $GITHUB_OUTPUT
+          else
+            # Push event - process all subjects
+            subjects=$(find output/raw -maxdepth 1 -type d -name "sub-*" -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
+            echo "subjects=$subjects" >> $GITHUB_OUTPUT
+          fi
+          echo "Subjects to process: $subjects"
+
+  process-data:
+    needs: get-subjects
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        subject: ${{ fromJson(needs.get-subjects.outputs.subjects) }}
+      fail-fast: false  # Continue processing other subjects if one fails
     steps:
       - uses: actions/checkout@v4
       
@@ -77,6 +129,7 @@ jobs:
           mkdir -p output/raw
           mkdir -p preprocessed_data
           mkdir -p results/metrics
+          mkdir -p results/flags
           echo "Directory structure created:"
           tree -L 2
           
@@ -86,28 +139,20 @@ jobs:
           echo "Syncing data from Dropbox..."
           rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
           
-      - name: Process data
+      - name: Process subject ${{ matrix.subject }}
         run: |
           source .venv/bin/activate
-          echo "Processing data..."
-          # For push events, process all subjects
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "Processing all subjects..."
-            python preprocess.py
-            python calculate_metrics.py
-            python generate_flags.py
-          else
-            # For manual triggers, process specific subject
-            python preprocess.py ${{ github.event.inputs.subject_folder }}
-            python calculate_metrics.py ${{ github.event.inputs.subject_folder }}
-            python generate_flags.py ${{ github.event.inputs.subject_folder }}
-          fi
+          echo "Processing subject: ${{ matrix.subject }}"
+          python preprocess.py ${{ matrix.subject }}
+          python calculate_metrics.py ${{ matrix.subject }}
+          python generate_flags.py ${{ matrix.subject }}
           
-      - name: Upload results
+      - name: Upload results for ${{ matrix.subject }}
         uses: actions/upload-artifact@v4
         with:
-          name: processed-data
+          name: processed-data-${{ matrix.subject }}
           path: |
-            results/
-            preprocessed_data/
+            results/metrics/${{ matrix.subject }}/
+            results/flags/${{ matrix.subject }}/
+            preprocessed_data/${{ matrix.subject }}/
           if-no-files-found: error 

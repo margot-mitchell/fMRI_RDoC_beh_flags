@@ -13,19 +13,19 @@ def get_metrics(df: pl.DataFrame, group_by: Optional[List[str]] = None) -> pl.Da
     Returns:
         pl.DataFrame: DataFrame with calculated metrics.
     """
-    # Calculate accuracy using correct_trial
+    # Calculate accuracy using correct_trial (only for trials with responses)
     accuracy = df.group_by(group_by).agg(
-        pl.col('correct_trial').mean().alias('accuracy')
+        pl.col('correct_trial').filter(pl.col('rt').is_not_null()).mean().alias('accuracy')
     )
 
-    # Calculate omission rate using correct_trial
+    # Calculate omission rate using RT (trials where no response was given)
     omission_rate = df.group_by(group_by).agg(
-        pl.col('correct_trial').is_null().mean().alias('omission_rate')
+        pl.col('rt').is_null().mean().alias('omission_rate')
     )
 
-    # Calculate reaction time
+    # Calculate reaction time (only for trials with valid responses)
     rt = df.group_by(group_by).agg(
-        pl.col('rt').mean().alias('rt')
+        pl.col('rt').filter(pl.col('rt').is_not_null()).mean().alias('rt')
     )
 
     # Join all metrics
