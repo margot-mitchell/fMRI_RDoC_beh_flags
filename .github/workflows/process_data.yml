@@ -4,23 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       subject_folder:
-        description: 'Subject folder to process (e.g., sub-sM)'
-        required: true
+        description: 'Subject folder to process (e.g., sub-sM) - use for single subject only'
+        required: false
         type: string
       process_all:
         description: 'Process all subjects in parallel'
         required: false
         type: boolean
         default: false
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/process_data.yml'
-      - 'requirements.txt'
-      - 'preprocess.py'
-      - 'calculate_metrics.py'
-      - 'generate_flags.py'
+      specific_subjects:
+        description: 'Process specific subjects (comma-separated list, e.g., sub-sM,sub-sN,sub-sO) - leave empty if using other options'
+        required: false
+        type: string
 
 jobs:
   get-subjects:
@@ -51,19 +46,24 @@ jobs:
       - name: Get subject list
         id: get-subjects
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.process_all }}" = "true" ]; then
+          if [ "${{ github.event.inputs.process_all }}" = "true" ]; then
             # Get all subjects for parallel processing
             subjects=$(find output/raw -maxdepth 1 -type d -name "sub-*" -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
             echo "subjects=$subjects" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Processing all subjects: $subjects"
+          elif [ -n "${{ github.event.inputs.specific_subjects }}" ]; then
+            # Process specific subjects from comma-separated list
+            subjects=$(echo "${{ github.event.inputs.specific_subjects }}" | tr ',' '\n' | jq -R -s -c 'split("\n")[:-1]')
+            echo "subjects=$subjects" >> $GITHUB_OUTPUT
+            echo "Processing specific subjects: $subjects"
+          elif [ -n "${{ github.event.inputs.subject_folder }}" ]; then
             # Single subject mode
             echo "subjects=[\"${{ github.event.inputs.subject_folder }}\"]" >> $GITHUB_OUTPUT
+            echo "Processing single subject: ${{ github.event.inputs.subject_folder }}"
           else
-            # Push event - process all subjects
-            subjects=$(find output/raw -maxdepth 1 -type d -name "sub-*" -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
-            echo "subjects=$subjects" >> $GITHUB_OUTPUT
+            echo "Error: No valid option selected. Please choose one of: process_all, specific_subjects, or subject_folder"
+            exit 1
           fi
-          echo "Subjects to process: $subjects"
 
   process-data:
     needs: get-subjects
