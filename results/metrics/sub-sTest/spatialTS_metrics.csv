@@ -1,0 +1,16 @@
+metric,value,task,file
+na_accuracy,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_stay_cue_switch_accuracy,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_switch_cue_stay_accuracy,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_switch_cue_switch_accuracy,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+na_omission_rate,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_stay_cue_switch_omission_rate,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_switch_cue_stay_omission_rate,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_switch_cue_switch_omission_rate,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+na_rt,,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_stay_cue_switch_rt,,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_switch_cue_stay_rt,,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+task_switch_cue_switch_rt,,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+color_accuracy,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+form_accuracy,0.0,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet
+proportion_feedback,0.8,spatialTS,sub-sTest_task-spatialTS_run-1.json.parquet

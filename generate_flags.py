@@ -13,6 +13,7 @@ import sys
 import logging
 from typing import List, Tuple
 import importlib
+import argparse
 
 import polars as pl
 import pandas as pd
@@ -417,168 +418,187 @@ def get_all_metrics_and_thresholds(task_name: str) -> List[Tuple[str, float]]:
 
 def main():
     # Configure logging
-    logging.basicConfig(level=logging.WARNING)
-    logger = logging.getLogger(__name__)
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.WARNING)
 
-    if len(sys.argv) == 2:
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Generate quality control flags')
+    parser.add_argument('subject_folder', nargs='?', help='Subject folder to process (e.g., sub-SK)')
+    parser.add_argument('--session', help='Specific session to process (e.g., ses-1, ses-pretouch)')
+    args = parser.parse_args()
+
+    if args.subject_folder:
         # Single subject mode
-        subject_folders = [sys.argv[1]]
-    elif len(sys.argv) == 1:
+        subject_folders = [args.subject_folder]
+    else:
         # All subjects mode
-        preprocessed_dir = 'preprocessed_data'
-        subject_folders = [f for f in os.listdir(preprocessed_dir)
-                           if os.path.isdir(os.path.join(preprocessed_dir, f)) and f.startswith('sub-')]
+        metrics_dir = os.path.join('results', 'metrics')
+        subject_folders = [f for f in os.listdir(metrics_dir)
+                           if os.path.isdir(os.path.join(metrics_dir, f)) and f.startswith('sub-')]
         if not subject_folders:
-            print(f"No subject folders found in {preprocessed_dir}")
+            print(f"No subject folders found in {metrics_dir}")
             sys.exit(1)
         print(f"Processing all subjects: {', '.join(subject_folders)}")
-    else:
-        print("Usage: python generate_flags.py <subject_folder>")
-        print("Example: python generate_flags.py sub-SK")
-        print("Or run without arguments to process all subjects.")
-        sys.exit(1)
 
     for subject_folder in subject_folders:
-        print(f"Processing subject folder: {subject_folder}")
+        print(f"\nProcessing subject folder: {subject_folder}")
         
-        # Get all metrics files in the metrics directory
+        # Get all task directories for this subject
         metrics_dir = os.path.join('results', 'metrics', subject_folder)
         if not os.path.exists(metrics_dir):
             logging.error(f'Directory {metrics_dir} does not exist')
             continue
-            
-        metrics_files = [f for f in os.listdir(metrics_dir) if f.endswith('_metrics.csv')]
-        logger.info(f"Found {len(metrics_files)} metrics files: {metrics_files}")
-        
-        # Filter out practice and pretouch files before any processing
-        metrics_files = [f for f in metrics_files if 'practice' not in f and 'pretouch' not in f]
-        
-        all_flags = []
-        all_metrics = []
-        
-        # Process each metrics file
-        for metrics_file in metrics_files:
-            # Get task name from file name (remove _metrics.csv)
-            file_task_name = metrics_file.replace('_metrics.csv', '')
-            task_name = TASK_NAME_MAP.get(file_task_name)
-            
-            if task_name is None:
-                logger.warning(f"Unknown task name for file {metrics_file}, skipping")
-                continue
-            
-            logger.debug(f"Processing {file_task_name} (internal name: {task_name})")
-            
-            # Read metrics from CSV
-            metrics_path = os.path.join(metrics_dir, metrics_file)
-            task_metrics_df = pl.read_csv(metrics_path)
-            logger.debug(f"Found {len(task_metrics_df)} metrics in {metrics_file}")
-            
-            # Check thresholds
-            violations = check_thresholds_from_csv(task_metrics_df, task_name)
-            if violations:
-                for metric, value, threshold in violations:
-                    all_flags.append((task_name, metric, value, threshold))
-                    logger.warning(f"Flag generated: {task_name} - {metric} = {value} (threshold: {threshold})")
-            
-            # Get all metrics and thresholds for this task
-            metrics_thresholds = get_all_metrics_and_thresholds(task_name)
-            
-            # First, collect all the raw metrics
-            raw_metrics = {}
-            for metric_name, threshold in metrics_thresholds:
-                if metric_name != 'order_difference' and threshold is not None:
-                    filtered_df = task_metrics_df.filter(pl.col('metric') == metric_name)
-                    if len(filtered_df) > 0:
-                        # If there are multiple values, take the mean
-                        if len(filtered_df) > 1:
-                            value = filtered_df['value'].mean()
-                            logger.debug(f"Multiple values found for {metric_name}, taking mean: {value}")
-                        else:
-                            value = filtered_df['value'].item()
-                            
-                        if pd.notna(value):
-                            raw_metrics[metric_name] = value
-                            # Only add to all_metrics if it's not an N-back metric
-                            if not metric_name.startswith('nback_') and not metric_name.startswith('match_and_mismatch__'):
-                                all_metrics.append((task_name, metric_name, value, threshold))
-                                logger.debug(f"Added metric: {task_name} - {metric_name} = {value} (threshold: {threshold})")
-                    else:
-                        logger.warning(f"Metric {metric_name} not found in {metrics_file}")
-            
-            # Dynamically find RT metrics in the actual data and add them with general RT threshold
-            for metric_name in task_metrics_df['metric']:
-                if 'rt' in metric_name.lower() and metric_name not in raw_metrics:
-                    filtered_df = task_metrics_df.filter(pl.col('metric') == metric_name)
-                    if len(filtered_df) > 0:
-                        if len(filtered_df) > 1:
-                            value = filtered_df['value'].mean()
-                        else:
-                            value = filtered_df['value'].item()
-                        
-                        if pd.notna(value):
-                            all_metrics.append((task_name, metric_name, value, THRESHOLDS['RT_THRESHOLD']))
-                            logger.debug(f"Added RT metric: {task_name} - {metric_name} = {value} (threshold: {THRESHOLDS['RT_THRESHOLD']})")
-            
-            # Calculate Go/NoGo specific metrics if this is a Go/NoGo task
-            if task_name == 'gonogo':
-                gonogo_metrics = calculate_gonogo_metrics(raw_metrics)
-                for metric_name, value in gonogo_metrics.items():
-                    threshold = next((t for m, t in metrics_thresholds if m == metric_name), None)
-                    all_metrics.append((task_name, metric_name, value, threshold))
-                    logger.debug(f"Added calculated Go/NoGo metric: {task_name} - {metric_name} = {value} (threshold: {threshold})")
-            
-            # Calculate N-back specific metrics if this is an N-back task
-            elif task_name == 'nback':
-                nback_metrics = calculate_nback_metrics(raw_metrics)
-                for metric_name, value in nback_metrics.items():
-                    threshold = next((t for m, t in metrics_thresholds if m == metric_name), None)
-                    all_metrics.append((task_name, metric_name, value, threshold))
-                    logger.debug(f"Added calculated N-back metric: {task_name} - {metric_name} = {value} (threshold: {threshold})")
-            
-            # Calculate order difference for span tasks
-            if task_name in ['operation_span', 'simple_span']:
-                irrespective_acc = raw_metrics.get('mean_4x4_grid_accuracy_irrespective_of_order')
-                respective_acc = raw_metrics.get('mean_4x4_grid_accuracy_respective_of_order')
-                
-                if irrespective_acc is not None and respective_acc is not None and respective_acc != 0:
-                    order_diff = (irrespective_acc - respective_acc) / respective_acc
-                    threshold = THRESHOLDS['OP_SPAN_ORDER_DIFF'] if task_name == 'operation_span' else THRESHOLDS['SIMPLE_SPAN_ORDER_DIFF']
-                    all_metrics.append((task_name, 'order_difference', order_diff, threshold))
-                    logger.debug(f"Added calculated metric: {task_name} - order_difference = {order_diff} (threshold: {threshold})")
-                else:
-                    logger.warning(f"Could not calculate order difference for {task_name} - missing or invalid values")
-        
-        # Create output directory
+
+        # Get all task directories
+        task_dirs = [d for d in os.listdir(metrics_dir)
+                    if os.path.isdir(os.path.join(metrics_dir, d))]
+
+        # Prepare output directory
         output_dir = os.path.join('results', 'flags', subject_folder)
         os.makedirs(output_dir, exist_ok=True)
-        
-        # Save all metrics and their thresholds
-        metrics_df = pl.DataFrame(all_metrics, schema=['task', 'metric', 'value', 'threshold'], orient="row")
-        metrics_path = os.path.join(output_dir, 'all_metrics_checked.csv')
-        metrics_df.write_csv(metrics_path)
-        print(f"All task metrics checked and saved to {metrics_path}")
-        
-        # Save flags if any were generated
-        if all_flags:
-            flags_df = pl.DataFrame(all_flags, schema=['task', 'metric', 'value', 'threshold'], orient="row")
-            flags_path = os.path.join(output_dir, 'flags.csv')
-            flags_df.write_csv(flags_path)
-            logger.warning(f"Saved {len(all_flags)} flags to {flags_path}")
-        else:
-            print(f"No flags found for {subject_folder}")
+
+        # Process each task
+        for task_dir in task_dirs:
+            print(f"  Processing task: {task_dir}")
             
-            # Verify the file was created and has content
-            if os.path.exists(metrics_path):
-                file_size = os.path.getsize(metrics_path)
-                logger.debug(f"Output file size: {file_size} bytes")
-                if file_size == 0:
-                    logger.error("Output file is empty!")
-                else:
-                    # Read back the file to verify contents
-                    df = pl.read_csv(metrics_path)
-                    logger.debug(f"File contains {len(df)} rows")
+            # Get all CSV files for this task
+            task_path = os.path.join(metrics_dir, task_dir)
+            csv_files = [f for f in os.listdir(task_path) if f.endswith('.csv')]
+
+            if not csv_files:
+                logging.warning(f'No CSV files found in {task_path}')
+                continue
+
+            # Filter files by session if specified
+            if args.session:
+                session_files = [f for f in csv_files if args.session in f]
+                if not session_files:
+                    logging.warning(f'No files found for session {args.session} in {task_path}')
+                    continue
+                csv_files = session_files
+                print(f"    Processing {len(csv_files)} files for session {args.session}")
+
+            task_flags_list = []
+            all_metrics = []
+            
+            # Process each metrics file
+            for metrics_file in csv_files:
+                # Get task name from file name (remove _metrics.csv)
+                file_task_name = metrics_file.replace('_metrics.csv', '')
+                task_name = TASK_NAME_MAP.get(file_task_name)
+                
+                if task_name is None:
+                    logging.warning(f"Unknown task name for file {metrics_file}, skipping")
+                    continue
+                
+                logging.debug(f"Processing {file_task_name} (internal name: {task_name})")
+                
+                # Read metrics from CSV
+                metrics_path = os.path.join(task_path, metrics_file)
+                task_metrics_df = pl.read_csv(metrics_path)
+                logging.debug(f"Found {len(task_metrics_df)} metrics in {metrics_file}")
+                
+                # Check thresholds
+                violations = check_thresholds_from_csv(task_metrics_df, task_name)
+                if violations:
+                    for metric, value, threshold in violations:
+                        task_flags_list.append((task_name, metric, value, threshold))
+                        logging.warning(f"Flag generated: {task_name} - {metric} = {value} (threshold: {threshold})")
+                
+                # Get all metrics and thresholds for this task
+                metrics_thresholds = get_all_metrics_and_thresholds(task_name)
+                
+                # First, collect all the raw metrics
+                raw_metrics = {}
+                for metric_name, threshold in metrics_thresholds:
+                    if metric_name != 'order_difference' and threshold is not None:
+                        filtered_df = task_metrics_df.filter(pl.col('metric') == metric_name)
+                        if len(filtered_df) > 0:
+                            # If there are multiple values, take the mean
+                            if len(filtered_df) > 1:
+                                value = filtered_df['value'].mean()
+                                logging.debug(f"Multiple values found for {metric_name}, taking mean: {value}")
+                            else:
+                                value = filtered_df['value'].item()
+                                
+                            if pd.notna(value):
+                                raw_metrics[metric_name] = value
+                                # Only add to all_metrics if it's not an N-back metric
+                                if not metric_name.startswith('nback_') and not metric_name.startswith('match_and_mismatch__'):
+                                    all_metrics.append((task_name, metric_name, value, threshold))
+                                    logging.debug(f"Added metric: {task_name} - {metric_name} = {value} (threshold: {threshold})")
+                        else:
+                            logging.warning(f"Metric {metric_name} not found in {metrics_file}")
+                
+                # Dynamically find RT metrics in the actual data and add them with general RT threshold
+                for metric_name in task_metrics_df['metric']:
+                    if 'rt' in metric_name.lower() and metric_name not in raw_metrics:
+                        filtered_df = task_metrics_df.filter(pl.col('metric') == metric_name)
+                        if len(filtered_df) > 0:
+                            if len(filtered_df) > 1:
+                                value = filtered_df['value'].mean()
+                            else:
+                                value = filtered_df['value'].item()
+                            
+                            if pd.notna(value):
+                                all_metrics.append((task_name, metric_name, value, THRESHOLDS['RT_THRESHOLD']))
+                                logging.debug(f"Added RT metric: {task_name} - {metric_name} = {value} (threshold: {THRESHOLDS['RT_THRESHOLD']})")
+                
+                # Calculate Go/NoGo specific metrics if this is a Go/NoGo task
+                if task_name == 'gonogo':
+                    gonogo_metrics = calculate_gonogo_metrics(raw_metrics)
+                    for metric_name, value in gonogo_metrics.items():
+                        threshold = next((t for m, t in metrics_thresholds if m == metric_name), None)
+                        all_metrics.append((task_name, metric_name, value, threshold))
+                        logging.debug(f"Added calculated Go/NoGo metric: {task_name} - {metric_name} = {value} (threshold: {threshold})")
+                
+                # Calculate N-back specific metrics if this is an N-back task
+                elif task_name == 'nback':
+                    nback_metrics = calculate_nback_metrics(raw_metrics)
+                    for metric_name, value in nback_metrics.items():
+                        threshold = next((t for m, t in metrics_thresholds if m == metric_name), None)
+                        all_metrics.append((task_name, metric_name, value, threshold))
+                        logging.debug(f"Added calculated N-back metric: {task_name} - {metric_name} = {value} (threshold: {threshold})")
+                
+                # Calculate order difference for span tasks
+                if task_name in ['operation_span', 'simple_span']:
+                    irrespective_acc = raw_metrics.get('mean_4x4_grid_accuracy_irrespective_of_order')
+                    respective_acc = raw_metrics.get('mean_4x4_grid_accuracy_respective_of_order')
+                    
+                    if irrespective_acc is not None and respective_acc is not None and respective_acc != 0:
+                        order_diff = (irrespective_acc - respective_acc) / respective_acc
+                        threshold = THRESHOLDS['OP_SPAN_ORDER_DIFF'] if task_name == 'operation_span' else THRESHOLDS['SIMPLE_SPAN_ORDER_DIFF']
+                        all_metrics.append((task_name, 'order_difference', order_diff, threshold))
+                        logging.debug(f"Added calculated metric: {task_name} - order_difference = {order_diff} (threshold: {threshold})")
+                    else:
+                        logging.warning(f"Could not calculate order difference for {task_name} - missing or invalid values")
+            
+            # Save all metrics and their thresholds
+            metrics_df = pl.DataFrame(all_metrics, schema=['task', 'metric', 'value', 'threshold'], orient="row")
+            metrics_path = os.path.join(output_dir, f'{task_dir}_all_metrics_checked.csv')
+            metrics_df.write_csv(metrics_path)
+            print(f"All task metrics checked and saved to {metrics_path}")
+            
+            # Save flags if any were generated
+            if task_flags_list:
+                flags_df = pl.DataFrame(task_flags_list, schema=['task', 'metric', 'value', 'threshold'], orient="row")
+                flags_path = os.path.join(output_dir, f'{task_dir}_flags.csv')
+                flags_df.write_csv(flags_path)
+                logging.warning(f"Saved {len(task_flags_list)} flags to {flags_path}")
             else:
-                logger.error("Output file was not created!")
+                print(f"No flags found for {task_dir}")
+                
+                # Verify the file was created and has content
+                if os.path.exists(metrics_path):
+                    file_size = os.path.getsize(metrics_path)
+                    logging.debug(f"Output file size: {file_size} bytes")
+                    if file_size == 0:
+                        logging.error("Output file is empty!")
+                    else:
+                        # Read back the file to verify contents
+                        df = pl.read_csv(metrics_path)
+                        logging.debug(f"File contains {len(df)} rows")
+                else:
+                    logging.error("Output file was not created!")
 
 if __name__ == '__main__':
     main() 

@@ -1,0 +1,7 @@
+metric,value,task,file
+go_accuracy,1.0,goNogo_practice,sub-s6_task-goNogo_nogo_rdoc_practice__run-1.parquet
+go_omission_rate,0.0,goNogo_practice,sub-s6_task-goNogo_nogo_rdoc_practice__run-1.parquet
+gonogo_go_rt,334.8333333333333,goNogo_practice,sub-s6_task-goNogo_nogo_rdoc_practice__run-1.parquet
+nogo_accuracy,1.0,goNogo_practice,sub-s6_task-goNogo_nogo_rdoc_practice__run-1.parquet
+nogo_rt,,goNogo_practice,sub-s6_task-goNogo_nogo_rdoc_practice__run-1.parquet
+proportion_feedback,0.0,goNogo_practice,sub-s6_task-goNogo_nogo_rdoc_practice__run-1.parquet

@@ -1,0 +1,14 @@
+metric,value,task,file
+conjunction_24_accuracy,,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+conjunction_24_omission_rate,1.0,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+conjunction_24_rt,,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+conjunction_8_accuracy,,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+conjunction_8_omission_rate,1.0,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+conjunction_8_rt,,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+feature_24_accuracy,,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+feature_24_omission_rate,1.0,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+feature_24_rt,,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+feature_8_accuracy,,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+feature_8_omission_rate,1.0,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+feature_8_rt,,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet
+proportion_feedback,0.8,visualSearch,sub-sTest_task-visualSearch_run-1.json.parquet

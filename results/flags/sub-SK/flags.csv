@@ -1,0 +1,11 @@
+task,metric,value,threshold
+stroop,proportion_feedback,0.8,0.2
+nback,proportion_feedback,0.75,0.2
+spatial_ts,color_accuracy,0.5510204081632653,0.75
+spatial_ts,form_accuracy,0.5858585858585859,0.75
+spatial_ts,proportion_feedback,0.8,0.2
+visual_search,feature_8_omission_rate,0.07317073170731707,0.05
+flanker,congruent_accuracy,0.6557377049180327,0.75
+flanker,incongruent_accuracy,0.6,0.75
+flanker,proportion_feedback,0.8,0.2
+cued_ts,proportion_feedback,0.8,0.2

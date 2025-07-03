@@ -1,0 +1,17 @@
+task,metric,value,threshold
+stroop,congruent_accuracy,0.0,0.75
+stroop,incongruent_accuracy,0.0,0.75
+stroop,proportion_feedback,0.8,0.2
+spatial_ts,color_accuracy,0.0,0.75
+spatial_ts,form_accuracy,0.0,0.75
+spatial_ts,proportion_feedback,0.8,0.2
+visual_search,conjunction_24_omission_rate,1.0,0.05
+visual_search,conjunction_8_omission_rate,1.0,0.05
+visual_search,feature_24_omission_rate,1.0,0.05
+visual_search,feature_8_omission_rate,1.0,0.05
+visual_search,proportion_feedback,0.8,0.2
+flanker,congruent_accuracy,0.0,0.75
+flanker,incongruent_accuracy,0.0,0.75
+flanker,proportion_feedback,0.8,0.2
+stop_signal,go_accuracy,0.0,0.75
+stop_signal,proportion_feedback,0.8,0.2

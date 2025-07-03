@@ -1,0 +1,7 @@
+metric,value,task,file
+8x8_symmetric_accuracy,0.9741935483870968,opOnly,sub-sM_task-opOnly_run-1.json.parquet
+8x8_symmetric_rt,735.1225806451613,opOnly,sub-sM_task-opOnly_run-1.json.parquet
+8x8_asymmetric_accuracy,0.971830985915493,opOnly,sub-sM_task-opOnly_run-1.json.parquet
+8x8_asymmetric_rt,708.5281690140845,opOnly,sub-sM_task-opOnly_run-1.json.parquet
+8x8_grid_omission_rate,0.38632162661737524,opOnly,sub-sM_task-opOnly_run-1.json.parquet
+proportion_feedback,0.0,opOnly,sub-sM_task-opOnly_run-1.json.parquet

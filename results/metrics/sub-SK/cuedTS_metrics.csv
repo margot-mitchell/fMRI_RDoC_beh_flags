@@ -1,0 +1,13 @@
+metric,value,task,file
+task_stay_cue_stay_accuracy,0.8723404255319149,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+task_stay_cue_stay_omission_rate,0.5,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+task_stay_cue_stay_rt,816.2173913043479,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+task_stay_cue_switch_accuracy,0.8541666666666666,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+task_stay_cue_switch_omission_rate,0.5,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+task_stay_cue_switch_rt,853.1777777777778,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+task_switch_cue_switch_accuracy,0.7789473684210526,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+task_switch_cue_switch_omission_rate,0.5,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+task_switch_cue_switch_rt,855.6914893617021,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+magnitude_accuracy,0.8469387755102041,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+parity_accuracy,0.851063829787234,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet
+proportion_feedback,0.8,cuedTS,sub-SK_task-cuedTS_run-1.json.parquet

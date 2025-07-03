@@ -1,0 +1,11 @@
+metric,value,task,file
+go_accuracy,0.0,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+go_omission_rate,0.0,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+stop_signal_go_rt,,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+stop_accuracy,1.0,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+stop_omission_rate,0.0,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+min_SSD,250.0,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+max_SSD,1000.0,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+mean_SSD,899.7237569060774,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+final_SSD,0.0,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet
+proportion_feedback,0.8,stopSignal,sub-sTest_task-stopSignal_run-1.json.parquet

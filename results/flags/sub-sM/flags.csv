@@ -1,0 +1,7 @@
+task,metric,value,threshold
+operation_span,proportion_feedback,0.4,0.2
+ax_cpt,AX_omission_rate,0.5,0.05
+ax_cpt,BX_omission_rate,0.5,0.05
+ax_cpt,AY_omission_rate,0.5,0.05
+ax_cpt,BY_omission_rate,0.5,0.05
+stop_signal,go_accuracy,0.628099173553719,0.75

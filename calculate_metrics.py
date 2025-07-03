@@ -8,6 +8,7 @@ Usage:
     Example: python calculate_metrics.py sub-SK
 """
 
+import argparse
 import os
 import sys
 import logging
@@ -77,10 +78,16 @@ def main():
     # Configure logging
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.WARNING)
 
-    if len(sys.argv) == 2:
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Calculate behavioral metrics')
+    parser.add_argument('subject_folder', nargs='?', help='Subject folder to process (e.g., sub-SK)')
+    parser.add_argument('--session', help='Specific session to process (e.g., ses-1, ses-pretouch)')
+    args = parser.parse_args()
+
+    if args.subject_folder:
         # Single subject mode
-        subject_folders = [sys.argv[1]]
-    elif len(sys.argv) == 1:
+        subject_folders = [args.subject_folder]
+    else:
         # All subjects mode
         preprocessed_dir = 'preprocessed_data'
         subject_folders = [f for f in os.listdir(preprocessed_dir)
@@ -89,11 +96,6 @@ def main():
             print(f"No subject folders found in {preprocessed_dir}")
             sys.exit(1)
         print(f"Processing all subjects: {', '.join(subject_folders)}")
-    else:
-        print("Usage: python calculate_metrics.py <subject_folder>")
-        print("Example: python calculate_metrics.py sub-SK")
-        print("Or run without arguments to process all subjects.")
-        sys.exit(1)
 
     for subject_folder in subject_folders:
         print(f"\nProcessing subject folder: {subject_folder}")
@@ -129,6 +131,15 @@ def main():
             if not parquet_files:
                 logging.warning(f'No parquet files found in {task_path}')
                 continue
+
+            # Filter files by session if specified
+            if args.session:
+                session_files = [f for f in parquet_files if args.session in f]
+                if not session_files:
+                    logging.warning(f'No files found for session {args.session} in {task_path}')
+                    continue
+                parquet_files = session_files
+                print(f"    Processing {len(parquet_files)} files for session {args.session}")
 
             task_metrics_list = []
             # Process each file

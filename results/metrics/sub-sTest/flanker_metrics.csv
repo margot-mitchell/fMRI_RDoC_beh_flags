@@ -1,0 +1,8 @@
+metric,value,task,file
+congruent_accuracy,0.0,flanker,sub-sTest_task-flanker_run-1.json.parquet
+congruent_omission_rate,0.0,flanker,sub-sTest_task-flanker_run-1.json.parquet
+congruent_rt,,flanker,sub-sTest_task-flanker_run-1.json.parquet
+incongruent_accuracy,0.0,flanker,sub-sTest_task-flanker_run-1.json.parquet
+incongruent_omission_rate,0.0,flanker,sub-sTest_task-flanker_run-1.json.parquet
+incongruent_rt,,flanker,sub-sTest_task-flanker_run-1.json.parquet
+proportion_feedback,0.8,flanker,sub-sTest_task-flanker_run-1.json.parquet

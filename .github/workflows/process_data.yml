@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       subject_folder:
-        description: 'Subject folder to process (e.g., sub-sM) - use for single subject only'
+        description: 'Subject folder to process (e.g., sub-sM) - use for single subject/session processing'
+        required: false
+        type: string
+      session_name:
+        description: 'Session to process (e.g., ses-1, ses-pretouch) - leave empty to process all sessions for the subject'
         required: false
         type: string
       process_all:
@@ -22,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       subjects: ${{ steps.get-subjects.outputs.subjects }}
+      sessions: ${{ steps.get-subjects.outputs.sessions }}
     steps:
       - uses: actions/checkout@v4
       
@@ -43,23 +48,37 @@ jobs:
           mkdir -p output/raw
           rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
           
-      - name: Get subject list
+      - name: Get subject and session list
         id: get-subjects
         run: |
           if [ "${{ github.event.inputs.process_all }}" = "true" ]; then
             # Get all subjects for parallel processing
             subjects=$(find output/raw -maxdepth 1 -type d -name "sub-*" -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
             echo "subjects=$subjects" >> $GITHUB_OUTPUT
+            echo "sessions=[\"\"]" >> $GITHUB_OUTPUT
             echo "Processing all subjects: $subjects"
           elif [ -n "${{ github.event.inputs.specific_subjects }}" ]; then
             # Process specific subjects from comma-separated list
             subjects=$(echo "${{ github.event.inputs.specific_subjects }}" | tr ',' '\n' | jq -R -s -c 'split("\n")[:-1]')
             echo "subjects=$subjects" >> $GITHUB_OUTPUT
+            echo "sessions=[\"\"]" >> $GITHUB_OUTPUT
             echo "Processing specific subjects: $subjects"
           elif [ -n "${{ github.event.inputs.subject_folder }}" ]; then
             # Single subject mode
-            echo "subjects=[\"${{ github.event.inputs.subject_folder }}\"]" >> $GITHUB_OUTPUT
-            echo "Processing single subject: ${{ github.event.inputs.subject_folder }}"
+            subject="${{ github.event.inputs.subject_folder }}"
+            session="${{ github.event.inputs.session_name }}"
+            
+            if [ -n "$session" ]; then
+              # Single subject + session mode
+              echo "subjects=[\"$subject\"]" >> $GITHUB_OUTPUT
+              echo "sessions=[\"$session\"]" >> $GITHUB_OUTPUT
+              echo "Processing single subject and session: $subject/$session"
+            else
+              # Single subject, all sessions mode
+              echo "subjects=[\"$subject\"]" >> $GITHUB_OUTPUT
+              echo "sessions=[\"\"]" >> $GITHUB_OUTPUT
+              echo "Processing single subject (all sessions): $subject"
+            fi
           else
             echo "Error: No valid option selected. Please choose one of: process_all, specific_subjects, or subject_folder"
             exit 1
@@ -71,6 +90,7 @@ jobs:
     strategy:
       matrix:
         subject: ${{ fromJson(needs.get-subjects.outputs.subjects) }}
+        session: ${{ fromJson(needs.get-subjects.outputs.sessions) }}
       fail-fast: false  # Continue processing other subjects if one fails
     steps:
       - uses: actions/checkout@v4
@@ -139,18 +159,26 @@ jobs:
           echo "Syncing data from Dropbox..."
           rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
           
-      - name: Process subject ${{ matrix.subject }}
+      - name: Process subject ${{ matrix.subject }} session ${{ matrix.session }}
         run: |
           source .venv/bin/activate
           echo "Processing subject: ${{ matrix.subject }}"
-          python preprocess.py ${{ matrix.subject }}
-          python calculate_metrics.py ${{ matrix.subject }}
-          python generate_flags.py ${{ matrix.subject }}
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+            echo "Processing specific session: ${{ matrix.session }}"
+            python preprocess.py ${{ matrix.subject }} --session ${{ matrix.session }}
+            python calculate_metrics.py ${{ matrix.subject }} --session ${{ matrix.session }}
+            python generate_flags.py ${{ matrix.subject }} --session ${{ matrix.session }}
+          else
+            echo "Processing all sessions for subject"
+            python preprocess.py ${{ matrix.subject }}
+            python calculate_metrics.py ${{ matrix.subject }}
+            python generate_flags.py ${{ matrix.subject }}
+          fi
           
       - name: Upload results for ${{ matrix.subject }}
         uses: actions/upload-artifact@v4
         with:
-          name: processed-data-${{ matrix.subject }}
+          name: processed-data-${{ matrix.subject }}${{ matrix.session != '' && format('-{0}', matrix.session) || '' }}
           path: |
             results/metrics/${{ matrix.subject }}/
             results/flags/${{ matrix.subject }}/

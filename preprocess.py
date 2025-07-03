@@ -15,6 +15,7 @@ import logging
 import os
 import sys
 import subprocess
+import argparse
 from typing import List, Dict, Set
 from pathlib import Path
 
@@ -441,10 +442,16 @@ def main():
     # Configure logging
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
-    if len(sys.argv) == 2:
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Preprocess behavioral data')
+    parser.add_argument('subject_folder', nargs='?', help='Subject folder to process (e.g., sub-sM)')
+    parser.add_argument('--session', help='Specific session to process (e.g., ses-1, ses-pretouch)')
+    args = parser.parse_args()
+
+    if args.subject_folder:
         # Single subject mode
-        subject_folders = [sys.argv[1]]
-    elif len(sys.argv) == 1:
+        subject_folders = [args.subject_folder]
+    else:
         # All subjects mode
         raw_dir = os.path.join('output', 'raw')
         subject_folders = [f for f in os.listdir(raw_dir)
@@ -453,21 +460,36 @@ def main():
             print(f"No subject folders found in {raw_dir}")
             sys.exit(1)
         print(f"Processing all subjects: {', '.join(subject_folders)}")
-    else:
-        print("Usage: python preprocess.py <subject_folder>")
-        print("Example: python preprocess.py sub-sM")
-        print("Or run without arguments to process all subjects.")
-        sys.exit(1)
 
     for subject_folder in subject_folders:
         input_dir = os.path.join('output', 'raw', subject_folder)
         output_dir = os.path.join('preprocessed_data', subject_folder)
         os.makedirs(output_dir, exist_ok=True)
-        for root, dirs, files in os.walk(input_dir):
-            for file in files:
-                if file.endswith('.json'):
-                    input_file = os.path.join(root, file)
-                    process_file(input_file, output_dir)
+        
+        if args.session:
+            # Process specific session
+            session_dir = os.path.join(input_dir, args.session)
+            if os.path.exists(session_dir):
+                print(f"Processing session {args.session} for subject {subject_folder}")
+                for root, dirs, files in os.walk(session_dir):
+                    for file in files:
+                        if file.endswith('.json'):
+                            input_file = os.path.join(root, file)
+                            process_file(input_file, output_dir)
+            else:
+                # Check if session files are directly in subject folder
+                print(f"Session directory {session_dir} not found, checking subject folder for session files")
+                for file in os.listdir(input_dir):
+                    if file.endswith('.json') and args.session in file:
+                        input_file = os.path.join(input_dir, file)
+                        process_file(input_file, output_dir)
+        else:
+            # Process all files in subject folder
+            for root, dirs, files in os.walk(input_dir):
+                for file in files:
+                    if file.endswith('.json'):
+                        input_file = os.path.join(root, file)
+                        process_file(input_file, output_dir)
 
 
 if __name__ == '__main__':
