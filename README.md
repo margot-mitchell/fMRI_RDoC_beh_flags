@@ -97,7 +97,7 @@ Results are organized in clean artifact structures:
     ├── metrics/
     │   ├── <task>_metrics.csv
     │   └── ...
-    └── all_flags_check/
+    └── flags/
         ├── <task>_flags.csv
         └── ...
 ```
@@ -227,6 +227,7 @@ All thresholds are defined in `thresholds_config.py` and mapped in `generate_fla
 │   │   └── tasks/
 │   │       ├── tasks.py          # Task analysis functions
 │   │       └── utils.py          # Utility functions
+│   │
 │   └── ...
 ├── preprocess.py                 # Data preprocessing script
 ├── calculate_metrics.py          # Metrics calculation script
