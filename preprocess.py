@@ -401,12 +401,19 @@ def process_file(filepath: str, output_dir: str) -> None:
 
     # Create output filename
     run_num = None
+    session_name = None
+    
     for part in parts:
         if part.startswith('run-'):
             run_num = part[4:]
-            break
+        elif part.startswith('ses-'):
+            session_name = part
     
-    if run_num:
+    if run_num and session_name:
+        outname = f'{os.path.basename(output_dir)}_{session_name}_task-{task_name}_run-{run_num}.parquet'
+    elif session_name:
+        outname = f'{os.path.basename(output_dir)}_{session_name}_task-{task_name}.parquet'
+    elif run_num:
         outname = f'{os.path.basename(output_dir)}_task-{task_name}_run-{run_num}.parquet'
     else:
         outname = f'{os.path.basename(output_dir)}_task-{task_name}.parquet'
