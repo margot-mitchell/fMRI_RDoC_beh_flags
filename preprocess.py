@@ -430,7 +430,20 @@ def process_file(filepath: str, output_dir: str) -> None:
         with open(filepath, 'r') as f:
             data = json.load(f)
         
-        df = get_trialdata_df(data)
+        # Handle both 'trial_data' and 'trialdata' (stringified JSON)
+        if 'trial_data' in data:
+            trial_data = data['trial_data']
+        elif 'trialdata' in data:
+            try:
+                trial_data = json.loads(data['trialdata'])
+            except Exception as e:
+                logging.error(f"Error parsing 'trialdata' in {filepath}: {e}")
+                return
+        else:
+            logging.error(f"No 'trial_data' or 'trialdata' in {filepath}")
+            return
+        
+        df = get_trialdata_df(trial_data)
         
         # Validate columns for non-practice tasks
         if not ('pretouch' in filename.lower() or 'practice' in filename.lower()):
