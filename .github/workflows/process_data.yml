@@ -239,27 +239,81 @@ jobs:
           fi
           mkdir -p artifacts/$artifact_name
           
-          # Copy preprocessed data (remove subject folder nesting)
-          if [ -d "preprocessed_data/${{ matrix.subject }}" ]; then
-            mkdir -p artifacts/$artifact_name/preprocessed_data
-            cp -r preprocessed_data/${{ matrix.subject }}/* artifacts/$artifact_name/preprocessed_data/
-            echo "Copied preprocessed data to artifacts/$artifact_name/preprocessed_data/"
-          fi
-          
-          # Copy metrics (remove subject folder nesting)
-          if [ -d "results/metrics/${{ matrix.subject }}" ]; then
-            mkdir -p artifacts/$artifact_name/results/metrics
-            cp -r results/metrics/${{ matrix.subject }}/* artifacts/$artifact_name/results/metrics/
-            echo "Copied metrics to artifacts/$artifact_name/results/metrics/"
-          fi
-          
-          # Copy flags (remove subject folder nesting) - only if flags exist
-          if [ -d "results/flags/${{ matrix.subject }}" ] && [ "$(ls -A results/flags/${{ matrix.subject }}/ 2>/dev/null)" ]; then
-            mkdir -p artifacts/$artifact_name/results/flags
-            cp -r results/flags/${{ matrix.subject }}/* artifacts/$artifact_name/results/flags/
-            echo "Copied flags to artifacts/$artifact_name/results/flags/"
+          # Copy preprocessed data (session-specific)
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+            # For session-specific processing, only copy files for this session
+            if [ -d "preprocessed_data/${{ matrix.subject }}" ]; then
+              mkdir -p artifacts/$artifact_name/preprocessed_data
+              # Copy only files for this specific session
+              for task_dir in preprocessed_data/${{ matrix.subject }}/*/; do
+                if [ -d "$task_dir" ]; then
+                  task_name=$(basename "$task_dir")
+                  mkdir -p artifacts/$artifact_name/preprocessed_data/$task_name
+                  # Copy only files containing this session
+                  find "$task_dir" -name "*${{ matrix.session }}*" -type f -exec cp {} artifacts/$artifact_name/preprocessed_data/$task_name/ \;
+                fi
+              done
+              echo "Copied session-specific preprocessed data to artifacts/$artifact_name/preprocessed_data/"
+            fi
           else
-            echo "No flags found for ${{ matrix.subject }} - this is good (no quality control issues detected)"
+            # For all sessions processing, copy everything
+            if [ -d "preprocessed_data/${{ matrix.subject }}" ]; then
+              mkdir -p artifacts/$artifact_name/preprocessed_data
+              cp -r preprocessed_data/${{ matrix.subject }}/* artifacts/$artifact_name/preprocessed_data/
+              echo "Copied all preprocessed data to artifacts/$artifact_name/preprocessed_data/"
+            fi
+          fi
+          
+          # Copy metrics (session-specific)
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+            # For session-specific processing, only copy files for this session
+            if [ -d "results/metrics/${{ matrix.subject }}" ]; then
+              mkdir -p artifacts/$artifact_name/results/metrics
+              # Copy only files for this specific session
+              for task_dir in results/metrics/${{ matrix.subject }}/*/; do
+                if [ -d "$task_dir" ]; then
+                  task_name=$(basename "$task_dir")
+                  mkdir -p artifacts/$artifact_name/results/metrics/$task_name
+                  # Copy only files containing this session
+                  find "$task_dir" -name "*${{ matrix.session }}*" -type f -exec cp {} artifacts/$artifact_name/results/metrics/$task_name/ \;
+                fi
+              done
+              echo "Copied session-specific metrics to artifacts/$artifact_name/results/metrics/"
+            fi
+          else
+            # For all sessions processing, copy everything
+            if [ -d "results/metrics/${{ matrix.subject }}" ]; then
+              mkdir -p artifacts/$artifact_name/results/metrics
+              cp -r results/metrics/${{ matrix.subject }}/* artifacts/$artifact_name/results/metrics/
+              echo "Copied all metrics to artifacts/$artifact_name/results/metrics/"
+            fi
+          fi
+          
+          # Copy flags (session-specific) - only if flags exist
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+            # For session-specific processing, only copy files for this session
+            if [ -d "results/flags/${{ matrix.subject }}" ]; then
+              mkdir -p artifacts/$artifact_name/results/flags
+              # Copy only files for this specific session
+              for task_dir in results/flags/${{ matrix.subject }}/*/; do
+                if [ -d "$task_dir" ]; then
+                  task_name=$(basename "$task_dir")
+                  mkdir -p artifacts/$artifact_name/results/flags/$task_name
+                  # Copy only files containing this session
+                  find "$task_dir" -name "*${{ matrix.session }}*" -type f -exec cp {} artifacts/$artifact_name/results/flags/$task_name/ \;
+                fi
+              done
+              echo "Copied session-specific flags to artifacts/$artifact_name/results/flags/"
+            fi
+          else
+            # For all sessions processing, copy everything
+            if [ -d "results/flags/${{ matrix.subject }}" ] && [ "$(ls -A results/flags/${{ matrix.subject }}/ 2>/dev/null)" ]; then
+              mkdir -p artifacts/$artifact_name/results/flags
+              cp -r results/flags/${{ matrix.subject }}/* artifacts/$artifact_name/results/flags/
+              echo "Copied all flags to artifacts/$artifact_name/results/flags/"
+            else
+              echo "No flags found for ${{ matrix.subject }} - this is good (no quality control issues detected)"
+            fi
           fi
           
           echo "Artifact structure created:"
