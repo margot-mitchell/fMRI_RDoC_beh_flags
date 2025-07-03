@@ -33,7 +33,9 @@ ENV/
 
 # Project specific
 preprocessed_data/
+raw_data/
 outputs/
+output/raw/
 logs/
 *.log
 rclone.conf
