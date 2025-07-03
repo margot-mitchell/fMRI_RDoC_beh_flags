@@ -160,7 +160,16 @@ jobs:
         run: |
           source .venv/bin/activate
           echo "Syncing data from Dropbox..."
-          rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
+          
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+            # Sync only the specific session
+            echo "Syncing only session ${{ matrix.session }} for ${{ matrix.subject }}"
+            mkdir -p output/raw/${{ matrix.subject }}
+            rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/${{ matrix.subject }}/${{ matrix.session }}/ output/raw/${{ matrix.subject }}/${{ matrix.session }}/ --progress
+          else
+            # Sync entire subject folder
+            rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
+          fi
           
           echo "Verifying sync completed..."
           echo "Contents of output/raw:"
@@ -192,12 +201,41 @@ jobs:
             python generate_flags.py ${{ matrix.subject }}
           fi
           
+      - name: Organize results for artifact
+        run: |
+          echo "Organizing results for artifact upload..."
+          
+          # Create clean artifact structure
+          artifact_name="${{ matrix.subject }}${{ matrix.session != '' && format('-{0}', matrix.session) || '' }}_results"
+          mkdir -p artifacts/$artifact_name
+          
+          # Copy preprocessed data (remove subject folder nesting)
+          if [ -d "preprocessed_data/${{ matrix.subject }}" ]; then
+            mkdir -p artifacts/$artifact_name/preprocessed_data
+            cp -r preprocessed_data/${{ matrix.subject }}/* artifacts/$artifact_name/preprocessed_data/
+            echo "Copied preprocessed data to artifacts/$artifact_name/preprocessed_data/"
+          fi
+          
+          # Copy metrics (remove subject folder nesting)
+          if [ -d "results/metrics/${{ matrix.subject }}" ]; then
+            mkdir -p artifacts/$artifact_name/results/metrics
+            cp -r results/metrics/${{ matrix.subject }}/* artifacts/$artifact_name/results/metrics/
+            echo "Copied metrics to artifacts/$artifact_name/results/metrics/"
+          fi
+          
+          # Copy flags (remove subject folder nesting)
+          if [ -d "results/flags/${{ matrix.subject }}" ]; then
+            mkdir -p artifacts/$artifact_name/results/all_flags_check
+            cp -r results/flags/${{ matrix.subject }}/* artifacts/$artifact_name/results/all_flags_check/
+            echo "Copied flags to artifacts/$artifact_name/results/all_flags_check/"
+          fi
+          
+          echo "Artifact structure created:"
+          tree artifacts/$artifact_name || ls -la artifacts/$artifact_name
+          
       - name: Upload results for ${{ matrix.subject }}
         uses: actions/upload-artifact@v4
         with:
-          name: processed-data-${{ matrix.subject }}${{ matrix.session != '' && format('-{0}', matrix.session) || '' }}
-          path: |
-            results/metrics/${{ matrix.subject }}/
-            results/flags/${{ matrix.subject }}/
-            preprocessed_data/${{ matrix.subject }}/
+          name: ${{ matrix.subject }}${{ matrix.session != '' && format('-{0}', matrix.session) || '' }}_results
+          path: artifacts/${{ matrix.subject }}${{ matrix.session != '' && format('-{0}', matrix.session) || '' }}_results/
           if-no-files-found: error 
