@@ -244,11 +244,16 @@ jobs:
             echo "Copied metrics to artifacts/$artifact_name/results/metrics/"
           fi
           
-          # Copy flags (remove subject folder nesting)
-          if [ -d "results/flags/${{ matrix.subject }}" ]; then
+          # Copy flags (remove subject folder nesting) - only if flags exist
+          if [ -d "results/flags/${{ matrix.subject }}" ] && [ "$(ls -A results/flags/${{ matrix.subject }}/ 2>/dev/null)" ]; then
             mkdir -p artifacts/$artifact_name/results/all_flags_check
             cp -r results/flags/${{ matrix.subject }}/* artifacts/$artifact_name/results/all_flags_check/
             echo "Copied flags to artifacts/$artifact_name/results/all_flags_check/"
+          else
+            echo "No flags found for ${{ matrix.subject }} - this is good (no quality control issues detected)"
+            # Create empty flags directory to maintain structure
+            mkdir -p artifacts/$artifact_name/results/all_flags_check
+            echo "No quality control flags generated" > artifacts/$artifact_name/results/all_flags_check/README.txt
           fi
           
           echo "Artifact structure created:"
