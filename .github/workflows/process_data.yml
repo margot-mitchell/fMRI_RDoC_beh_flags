@@ -7,8 +7,8 @@ on:
         description: 'Subject folder to process (e.g., sub-sM) - use for single subject/session processing'
         required: false
         type: string
-      session_name:
-        description: 'Session to process (e.g., ses-1, ses-pretouch) - leave empty to process all sessions for the subject'
+      session_names:
+        description: 'Comma-separated list of sessions to process (e.g., ses-1,ses-2,ses-pretouch) - leave empty to process all sessions for the subject'
         required: false
         type: string
       process_all:
@@ -52,29 +52,26 @@ jobs:
         id: get-subjects
         run: |
           if [ "${{ github.event.inputs.process_all }}" = "true" ]; then
-            # Get all subjects for parallel processing
             subjects=$(find output/raw -maxdepth 1 -type d -name "sub-*" -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
             echo "subjects=$subjects" >> $GITHUB_OUTPUT
             echo "sessions=[\"\"]" >> $GITHUB_OUTPUT
             echo "Processing all subjects: $subjects"
           elif [ -n "${{ github.event.inputs.specific_subjects }}" ]; then
-            # Process specific subjects from comma-separated list
             subjects=$(echo "${{ github.event.inputs.specific_subjects }}" | tr ',' '\n' | jq -R -s -c 'split("\n")[:-1]')
             echo "subjects=$subjects" >> $GITHUB_OUTPUT
             echo "sessions=[\"\"]" >> $GITHUB_OUTPUT
             echo "Processing specific subjects: $subjects"
           elif [ -n "${{ github.event.inputs.subject_folder }}" ]; then
-            # Single subject mode
             subject="${{ github.event.inputs.subject_folder }}"
-            session="${{ github.event.inputs.session_name }}"
-            
-            if [ -n "$session" ]; then
-              # Single subject + session mode
+            session_names="${{ github.event.inputs.session_names }}"
+            if [ -n "$session_names" ]; then
+              # Parse comma-separated list into JSON array
+              IFS=',' read -ra session_arr <<< "$session_names"
+              sessions=$(printf '%s\n' "${session_arr[@]}" | jq -R -s -c 'split("\n")[:-1]')
               echo "subjects=[\"$subject\"]" >> $GITHUB_OUTPUT
-              echo "sessions=[\"$session\"]" >> $GITHUB_OUTPUT
-              echo "Processing single subject and session: $subject/$session"
+              echo "sessions=$sessions" >> $GITHUB_OUTPUT
+              echo "Processing single subject and sessions: $subject/$sessions"
             else
-              # Single subject, all sessions mode
               echo "subjects=[\"$subject\"]" >> $GITHUB_OUTPUT
               echo "sessions=[\"\"]" >> $GITHUB_OUTPUT
               echo "Processing single subject (all sessions): $subject"
