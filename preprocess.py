@@ -474,22 +474,21 @@ def main():
         os.makedirs(output_dir, exist_ok=True)
         
         if args.session:
-            # Process specific session
+            # Process specific session ONLY if the directory exists and has .json files
             session_dir = os.path.join(input_dir, args.session)
             if os.path.exists(session_dir):
                 print(f"Processing session {args.session} for subject {subject_folder}")
+                found = False
                 for root, dirs, files in os.walk(session_dir):
                     for file in files:
                         if file.endswith('.json'):
+                            found = True
                             input_file = os.path.join(root, file)
                             process_file(input_file, output_dir)
+                if not found:
+                    print(f"No .json files found in {session_dir} for session {args.session}.")
             else:
-                # Check if session files are directly in subject folder
-                print(f"Session directory {session_dir} not found, checking subject folder for session files")
-                for file in os.listdir(input_dir):
-                    if file.endswith('.json') and args.session in file:
-                        input_file = os.path.join(input_dir, file)
-                        process_file(input_file, output_dir)
+                print(f"Session directory {session_dir} not found for subject {subject_folder}. Skipping.")
         else:
             # Process all files in subject folder
             for root, dirs, files in os.walk(input_dir):
