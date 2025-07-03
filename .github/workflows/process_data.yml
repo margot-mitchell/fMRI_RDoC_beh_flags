@@ -165,9 +165,18 @@ jobs:
             # Sync only the specific session
             echo "Syncing only session ${{ matrix.session }} for ${{ matrix.subject }}"
             mkdir -p output/raw/${{ matrix.subject }}
-            rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/${{ matrix.subject }}/${{ matrix.session }}/ output/raw/${{ matrix.subject }}/${{ matrix.session }}/ --progress
+            
+            # Debug: Show the exact command
+            SOURCE_PATH="rdoc_dropbox:rdoc_fmri_behavior/output/raw/${{ matrix.subject }}/${{ matrix.session }}/"
+            DEST_PATH="output/raw/${{ matrix.subject }}/${{ matrix.session }}/"
+            echo "Source: '$SOURCE_PATH'"
+            echo "Dest: '$DEST_PATH'"
+            echo "Executing: rclone sync '$SOURCE_PATH' '$DEST_PATH' --progress"
+            
+            rclone sync "$SOURCE_PATH" "$DEST_PATH" --progress
           else
             # Sync entire subject folder
+            echo "Syncing entire subject folder"
             rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
           fi
           
