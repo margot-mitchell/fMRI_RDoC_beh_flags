@@ -12,37 +12,6 @@ from .utils import get_metrics, organize_metrics
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-def get_stop_metrics(df: pl.DataFrame) -> pl.DataFrame:
-    """Calculate stop-signal metrics.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing stop-signal task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with 'metric' and 'value' columns.
-    """
-    metrics = {}
-    
-    # Only calculate SSD metrics if the column exists
-    if 'SSD' in df.columns:
-        metrics.update({
-            'min_SSD': float(df.select(pl.col('SSD').min()).item()),
-            'max_SSD': float(df.select(pl.col('SSD').max()).item()),
-            'mean_SSD': float(df.select(pl.col('SSD').mean()).item()),
-            'final_SSD': float(df.select(pl.col('SSD').last()).item()),
-        })
-    
-    # Add stop omission rate if it exists
-    if 'stop_omission_rate' in df.columns:
-        metrics['stop_omission_rate'] = float(df.select(pl.col('stop_omission_rate').mean()).item())
-    
-    # Convert all values to float to ensure consistent types
-    metrics = {k: float(v) if v is not None else None for k, v in metrics.items()}
-    
-    return pl.DataFrame(
-        {'metric': list(metrics.keys()), 'value': list(metrics.values())}
-    )
-
 def get_span_metrics(test_trials: pl.DataFrame):
     """Calculate span task metrics.
 
@@ -672,7 +641,12 @@ def go_nogo_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     # Calculate nogo trial metrics
     nogo_trials = test_trials.filter(pl.col('condition') == 'nogo')
-    nogo_metrics = get_metrics(nogo_trials)
+    
+    # For nogo trials, accuracy is the proportion of trials with no response (successful inhibition)
+    nogo_accuracy = nogo_trials.select(pl.col('rt').is_null().mean()).item() if nogo_trials.height > 0 else None
+    
+    # Calculate nogo RT (only for trials where participant incorrectly responded)
+    nogo_rt = nogo_trials.select(pl.col('rt').filter(pl.col('rt').is_not_null()).mean()).item() if nogo_trials.height > 0 else None
     
     # Calculate proportion_feedback
     def parse_feedback(x):
@@ -700,8 +674,8 @@ def go_nogo_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             go_metrics['accuracy'][0] if go_metrics.height > 0 else None,
             go_metrics['omission_rate'][0] if go_metrics.height > 0 else None,
             go_metrics['rt'][0] if go_metrics.height > 0 else None,
-            nogo_metrics['accuracy'][0] if nogo_metrics.height > 0 else None,
-            nogo_metrics['rt'][0] if nogo_metrics.height > 0 else None,
+            nogo_accuracy,
+            nogo_rt,
             proportion_feedback
         ]
     })
@@ -1228,7 +1202,9 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     # Calculate stop trial metrics
     stop_trials = test_trials.filter(pl.col('condition') == 'stop')
-    stop_metrics = get_metrics(stop_trials)
+    
+    # For stop trials, accuracy is the proportion of trials with no response (successful inhibition)
+    stop_accuracy = stop_trials.select(pl.col('rt').is_null().mean()).item() if stop_trials.height > 0 else None
     
     # Calculate SSD metrics
     ssd_metrics = {}
@@ -1268,7 +1244,6 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             'go_omission_rate',
             'stop_signal_go_rt',
             'stop_accuracy',
-            'stop_omission_rate',
             'min_SSD',
             'max_SSD',
             'mean_SSD',
@@ -1279,8 +1254,7 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             go_metrics['accuracy'][0] if go_metrics.height > 0 else None,
             go_metrics['omission_rate'][0] if go_metrics.height > 0 else None,
             go_metrics['rt'][0] if go_metrics.height > 0 else None,
-            stop_metrics['accuracy'][0] if stop_metrics.height > 0 else None,
-            stop_metrics['omission_rate'][0] if stop_metrics.height > 0 else None,
+            stop_accuracy,
             ssd_metrics.get('min_SSD'),
             ssd_metrics.get('max_SSD'),
             ssd_metrics.get('mean_SSD'),
