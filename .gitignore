@@ -40,6 +40,10 @@ logs/
 *.log
 rclone.conf
 
+# Test and utility scripts
+test_accuracy_calc.py
+discover_sessions.py
+
 # OS specific
 .DS_Store
 Thumbs.db

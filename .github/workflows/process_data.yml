@@ -201,6 +201,18 @@ jobs:
             python generate_flags.py ${{ matrix.subject }}
           fi
           
+      - name: Test metrics completeness
+        run: |
+          source .venv/bin/activate
+          echo "Testing metrics completeness for ${{ matrix.subject }}"
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+            echo "Testing specific session: ${{ matrix.session }}"
+            python test_metrics_completeness.py ${{ matrix.subject }} --session ${{ matrix.session }}
+          else
+            echo "Testing all sessions for subject"
+            python test_metrics_completeness.py ${{ matrix.subject }}
+          fi
+          
       - name: Organize results for artifact
         run: |
           echo "Organizing results for artifact upload..."

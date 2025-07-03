@@ -1,8 +1,0 @@
-metric,value,task,file
-4x4_grid_omission_rate,0.9080882352941176,simpleSpan,sub-sM_task-simpleSpan_run-1.json.parquet
-mean_4x4_grid_accuracy_entirely_correct,0.5217391304347826,simpleSpan,sub-sM_task-simpleSpan_run-1.json.parquet
-mean_4x4_grid_accuracy_irrespective_of_order,0.9,simpleSpan,sub-sM_task-simpleSpan_run-1.json.parquet
-mean_4x4_grid_accuracy_respective_of_order,0.77,simpleSpan,sub-sM_task-simpleSpan_run-1.json.parquet
-mean_number_of_responses,3.92,simpleSpan,sub-sM_task-simpleSpan_run-1.json.parquet
-mean_time_remaining_after_last_response,-2890.9919136971494,simpleSpan,sub-sM_task-simpleSpan_run-1.json.parquet
-proportion_feedback,0.0,simpleSpan,sub-sM_task-simpleSpan_run-1.json.parquet
