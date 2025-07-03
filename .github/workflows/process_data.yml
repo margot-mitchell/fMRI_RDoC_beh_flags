@@ -140,6 +140,12 @@ jobs:
           }
           echo "Successfully connected to Dropbox"
           
+          # List what's available for the specific subject
+          if [ -n "${{ matrix.subject }}" ]; then
+            echo "Available sessions for ${{ matrix.subject }} in Dropbox:"
+            rclone lsd rdoc_dropbox:rdoc_fmri_behavior/output/raw/${{ matrix.subject }}/ 2>/dev/null || echo "Subject not found in Dropbox"
+          fi
+          
       - name: Create directory structure
         run: |
           echo "Creating required directories..."
@@ -155,6 +161,20 @@ jobs:
           source .venv/bin/activate
           echo "Syncing data from Dropbox..."
           rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ output/raw/ --progress
+          
+          echo "Verifying sync completed..."
+          echo "Contents of output/raw:"
+          ls -la output/raw/
+          
+          if [ -n "${{ matrix.subject }}" ]; then
+            echo "Contents of ${{ matrix.subject }} directory:"
+            ls -la output/raw/${{ matrix.subject }}/ || echo "Subject directory not found"
+          fi
+          
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+            echo "Checking for session ${{ matrix.session }} in ${{ matrix.subject }}:"
+            ls -la output/raw/${{ matrix.subject }}/${{ matrix.session }}/ 2>/dev/null || echo "Session directory not found"
+          fi
           
       - name: Process subject ${{ matrix.subject }} session ${{ matrix.session }}
         run: |
