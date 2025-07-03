@@ -3,7 +3,7 @@ AX_accuracy,0.9666666666666667,axCPT,sub-sM_task-axCPT_run-1.json.parquet
 AX_omission_rate,0.5,axCPT,sub-sM_task-axCPT_run-1.json.parquet
 AX_rt,603.4,axCPT,sub-sM_task-axCPT_run-1.json.parquet
 BX_accuracy,1.0,axCPT,sub-sM_task-axCPT_run-1.json.parquet
-BX_omission_rate,0.5,axCPT,sub-sM_task-axCPT_run-1.json.parquet
+BX_omission_rate,0.4838709677419355,axCPT,sub-sM_task-axCPT_run-1.json.parquet
 BX_rt,654.28125,axCPT,sub-sM_task-axCPT_run-1.json.parquet
 AY_accuracy,1.0,axCPT,sub-sM_task-axCPT_run-1.json.parquet
 AY_omission_rate,0.5,axCPT,sub-sM_task-axCPT_run-1.json.parquet

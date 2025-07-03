@@ -3,7 +3,6 @@ go_accuracy,0.628099173553719,stopSignal,sub-sM_task-stopSignal_run-1.json.parqu
 go_omission_rate,0.0,stopSignal,sub-sM_task-stopSignal_run-1.json.parquet
 stop_signal_go_rt,683.6611570247934,stopSignal,sub-sM_task-stopSignal_run-1.json.parquet
 stop_accuracy,0.5333333333333333,stopSignal,sub-sM_task-stopSignal_run-1.json.parquet
-stop_omission_rate,0.0,stopSignal,sub-sM_task-stopSignal_run-1.json.parquet
 min_SSD,250.0,stopSignal,sub-sM_task-stopSignal_run-1.json.parquet
 max_SSD,600.0,stopSignal,sub-sM_task-stopSignal_run-1.json.parquet
 mean_SSD,444.1988950276243,stopSignal,sub-sM_task-stopSignal_run-1.json.parquet
