@@ -16,7 +16,7 @@ import logging
 import polars as pl
 import pandas as pd
 from typing import Dict, List, Set, Tuple
-from generate_flags import TASK_NAME_MAP, THRESHOLDS, get_all_metrics_and_thresholds
+from generate_flags import TASK_NAME_MAP, THRESHOLDS, get_all_metrics_and_thresholds, METRIC_TO_THRESHOLD
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -108,90 +108,92 @@ def test_metrics_completeness(subject_folder: str = None, session: str = None) -
     for subject in subject_folders:
         logger.info(f"\nTesting subject: {subject}")
         
-        metrics_dir = os.path.join('results', 'metrics', subject)
+        # Determine the metrics directory based on session
+        if session:
+            # For session-specific processing, look in subject/session/metrics
+            metrics_dir = os.path.join('results', 'metrics', subject, session)
+        else:
+            # For all sessions processing, look in subject/metrics
+            metrics_dir = os.path.join('results', 'metrics', subject)
+        
         if not os.path.exists(metrics_dir):
-            logger.error(f"Subject metrics directory {metrics_dir} does not exist")
+            logger.error(f"Metrics directory {metrics_dir} does not exist")
             continue
         
-        # Get all task directories
-        task_dirs = [d for d in os.listdir(metrics_dir)
-                    if os.path.isdir(os.path.join(metrics_dir, d))]
+        # Get all CSV files directly in the metrics directory
+        csv_files = [f for f in os.listdir(metrics_dir) if f.endswith('.csv')]
         
-        for task_dir in task_dirs:
-            logger.info(f"  Testing task: {task_dir}")
+        if not csv_files:
+            logger.warning(f"No CSV files found in {metrics_dir}")
+            continue
+        
+        # Process each metrics file
+        for metrics_file in csv_files:
+            # Get task name from file name (remove _metrics.csv)
+            file_task_name = metrics_file.replace('_metrics.csv', '')
+            logger.info(f"  Testing task: {file_task_name}")
             
             # Check task name mapping
-            task_name = TASK_NAME_MAP.get(task_dir)
+            task_name = TASK_NAME_MAP.get(file_task_name)
             if task_name is None:
-                issues['task_mapping_issues'].append(f"{subject}/{task_dir}: No mapping found in TASK_NAME_MAP")
-                logger.warning(f"    No task mapping found for {task_dir}")
+                issues['task_mapping_issues'].append(f"{subject}/{file_task_name}: No mapping found in TASK_NAME_MAP")
+                logger.warning(f"    No task mapping found for {file_task_name}")
                 continue
             
             # Get expected metrics for this task
             expected_metrics = get_expected_metrics_for_task(task_name)
             calculated_metrics = get_calculated_metrics_for_task(task_name)
             
-            # Get all CSV files for this task
-            task_path = os.path.join(metrics_dir, task_dir)
-            csv_files = [f for f in os.listdir(task_path) if f.endswith('.csv')]
+            logger.info(f"    Testing file: {metrics_file}")
             
-            if not csv_files:
-                issues['missing_tasks'].append(f"{subject}/{task_dir}: No metrics files found")
-                logger.warning(f"    No metrics files found")
+            metrics_path = os.path.join(metrics_dir, metrics_file)
+            try:
+                task_metrics_df = pl.read_csv(metrics_path)
+            except Exception as e:
+                issues['invalid_values'].append(f"{subject}/{file_task_name}/{metrics_file}: Failed to read CSV - {e}")
+                logger.error(f"      Failed to read CSV: {e}")
                 continue
             
-            # Filter files by session if specified
-            if session:
-                session_files = [f for f in csv_files if session in f]
-                if not session_files:
-                    logger.warning(f"    No files found for session {session}")
-                    continue
-                csv_files = session_files
+            # Get actual metrics from the file
+            actual_metrics = set(task_metrics_df['metric'].to_list())
             
-            # Process each metrics file
-            for metrics_file in csv_files:
-                logger.info(f"    Testing file: {metrics_file}")
-                
-                metrics_path = os.path.join(task_path, metrics_file)
-                try:
-                    task_metrics_df = pl.read_csv(metrics_path)
-                except Exception as e:
-                    issues['invalid_values'].append(f"{subject}/{task_dir}/{metrics_file}: Failed to read CSV - {e}")
-                    logger.error(f"      Failed to read CSV: {e}")
+            # Check for missing expected metrics
+            missing_metrics = expected_metrics - actual_metrics
+            if missing_metrics:
+                issues['missing_metrics'].append(
+                    f"{subject}/{file_task_name}/{metrics_file}: Missing metrics - {', '.join(sorted(missing_metrics))}"
+                )
+                logger.warning(f"      Missing metrics: {', '.join(sorted(missing_metrics))}")
+            
+            # Check for invalid values (NaN, None, etc.)
+            for metric in actual_metrics:
+                filtered_df = task_metrics_df.filter(pl.col('metric') == metric)
+                if len(filtered_df) > 0:
+                    value = filtered_df['value'].item()
+                    if pd.isna(value) or value is None:
+                        issues['invalid_values'].append(
+                            f"{subject}/{file_task_name}/{metrics_file}: Invalid value for {metric} - {value}"
+                        )
+                        logger.warning(f"      Invalid value for {metric}: {value}")
+            
+            # Check that all metrics have appropriate thresholds
+            for metric in actual_metrics:
+                # Skip calculated metrics as they don't have direct thresholds
+                if metric in calculated_metrics:
                     continue
                 
-                # Get actual metrics from the file
-                actual_metrics = set(task_metrics_df['metric'].to_list())
+                # Check if metric has a threshold defined
+                threshold_found = False
                 
-                # Check for missing expected metrics
-                missing_metrics = expected_metrics - actual_metrics
-                if missing_metrics:
-                    issues['missing_metrics'].append(
-                        f"{subject}/{task_dir}/{metrics_file}: Missing metrics - {', '.join(sorted(missing_metrics))}"
-                    )
-                    logger.warning(f"      Missing metrics: {', '.join(sorted(missing_metrics))}")
+                # Get expected metrics and thresholds for this task
+                expected_metrics_thresholds = get_all_metrics_and_thresholds(task_name)
+                expected_metric_names = [metric_name for metric_name, _ in expected_metrics_thresholds]
                 
-                # Check for invalid values (NaN, None, etc.)
-                for metric in actual_metrics:
-                    filtered_df = task_metrics_df.filter(pl.col('metric') == metric)
-                    if len(filtered_df) > 0:
-                        value = filtered_df['value'].item()
-                        if pd.isna(value) or value is None:
-                            issues['invalid_values'].append(
-                                f"{subject}/{task_dir}/{metrics_file}: Invalid value for {metric} - {value}"
-                            )
-                            logger.warning(f"      Invalid value for {metric}: {value}")
-                
-                # Check that all metrics have appropriate thresholds
-                for metric in actual_metrics:
-                    # Skip calculated metrics as they don't have direct thresholds
-                    if metric in calculated_metrics:
-                        continue
-                    
-                    # Check if metric has a threshold defined
-                    threshold_found = False
-                    
-                    # Check METRIC_TO_THRESHOLD mapping
+                # Check if metric is in the expected list
+                if metric in expected_metric_names:
+                    threshold_found = True
+                else:
+                    # Check METRIC_TO_THRESHOLD mapping as fallback
                     if metric in METRIC_TO_THRESHOLD:
                         threshold_found = True
                     else:
@@ -205,12 +207,12 @@ def test_metrics_completeness(subject_folder: str = None, session: str = None) -
                             threshold_var = f'{task_upper}_{metric_upper}'
                             if threshold_var in THRESHOLDS or metric_upper in THRESHOLDS:
                                 threshold_found = True
-                    
-                    if not threshold_found:
-                        issues['unchecked_metrics'].append(
-                            f"{subject}/{task_dir}/{metrics_file}: No threshold found for {metric}"
-                        )
-                        logger.warning(f"      No threshold found for {metric}")
+                
+                if not threshold_found:
+                    issues['unchecked_metrics'].append(
+                        f"{subject}/{file_task_name}/{metrics_file}: No threshold found for {metric}"
+                    )
+                    logger.warning(f"      No threshold found for {metric}")
     
     return issues
 

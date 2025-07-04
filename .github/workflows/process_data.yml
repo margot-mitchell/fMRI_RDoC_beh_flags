@@ -283,41 +283,39 @@ jobs:
             fi
           fi
           
-          # Copy metrics (session-specific)
+          # Copy metrics with proper folder structure
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
-            # For session-specific processing, copy the entire metrics CSV files
-            # since they contain data for this session but don't have session name in filename
+            # For session-specific processing, create subject/session/metrics structure
             if [ -d "results/metrics/${{ matrix.subject }}" ]; then
-              mkdir -p artifacts/$artifact_name/results/metrics
+              mkdir -p artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics
               # Copy all CSV files for this subject (they contain the session data)
-              find "results/metrics/${{ matrix.subject }}" -name "*.csv" -type f -exec cp {} artifacts/$artifact_name/results/metrics/ \;
-              echo "Copied session-specific metrics to artifacts/$artifact_name/results/metrics/"
+              find "results/metrics/${{ matrix.subject }}" -name "*.csv" -type f -exec cp {} artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics/ \;
+              echo "Copied session-specific metrics to artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics/"
             fi
           else
-            # For all sessions processing, copy everything
+            # For all sessions processing, copy everything with subject structure
             if [ -d "results/metrics/${{ matrix.subject }}" ]; then
-              mkdir -p artifacts/$artifact_name/results/metrics
-              cp -r results/metrics/${{ matrix.subject }}/* artifacts/$artifact_name/results/metrics/
-              echo "Copied all metrics to artifacts/$artifact_name/results/metrics/"
+              mkdir -p artifacts/$artifact_name/results/${{ matrix.subject }}/metrics
+              cp -r results/metrics/${{ matrix.subject }}/* artifacts/$artifact_name/results/${{ matrix.subject }}/metrics/
+              echo "Copied all metrics to artifacts/$artifact_name/results/${{ matrix.subject }}/metrics/"
             fi
           fi
           
-          # Copy flags (session-specific) - only if flags exist
+          # Copy flags with proper folder structure - only if flags exist
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
-            # For session-specific processing, copy all flag files for this subject
-            # since they contain data for this session but may not have session name in filename
+            # For session-specific processing, create subject/session/flags structure
             if [ -d "results/flags/${{ matrix.subject }}" ]; then
-              mkdir -p artifacts/$artifact_name/results/flags
+              mkdir -p artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags
               # Copy all flag files for this subject (they contain the session data)
-              find "results/flags/${{ matrix.subject }}" -name "*" -type f -exec cp {} artifacts/$artifact_name/results/flags/ \;
-              echo "Copied session-specific flags to artifacts/$artifact_name/results/flags/"
+              find "results/flags/${{ matrix.subject }}" -name "*" -type f -exec cp {} artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags/ \;
+              echo "Copied session-specific flags to artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags/"
             fi
           else
-            # For all sessions processing, copy everything
+            # For all sessions processing, copy everything with subject structure
             if [ -d "results/flags/${{ matrix.subject }}" ] && [ "$(ls -A results/flags/${{ matrix.subject }}/ 2>/dev/null)" ]; then
-              mkdir -p artifacts/$artifact_name/results/flags
-              cp -r results/flags/${{ matrix.subject }}/* artifacts/$artifact_name/results/flags/
-              echo "Copied all flags to artifacts/$artifact_name/results/flags/"
+              mkdir -p artifacts/$artifact_name/results/${{ matrix.subject }}/flags
+              cp -r results/flags/${{ matrix.subject }}/* artifacts/$artifact_name/results/${{ matrix.subject }}/flags/
+              echo "Copied all flags to artifacts/$artifact_name/results/${{ matrix.subject }}/flags/"
             else
               echo "No flags found for ${{ matrix.subject }} - this is good (no quality control issues detected)"
             fi
