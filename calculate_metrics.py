@@ -110,8 +110,13 @@ def main():
         task_dirs = [d for d in os.listdir(preprocessed_dir)
                     if os.path.isdir(os.path.join(preprocessed_dir, d))]
 
-        # Prepare output directory
-        output_dir = os.path.join('results', 'metrics', subject_folder)
+        # Prepare output directory - create subject/session/metrics structure
+        if args.session:
+            # For session-specific processing, create subject/session/metrics structure
+            output_dir = os.path.join('results', 'metrics', subject_folder, args.session)
+        else:
+            # For all sessions processing, create subject/metrics structure
+            output_dir = os.path.join('results', 'metrics', subject_folder)
         os.makedirs(output_dir, exist_ok=True)
 
         # Process each task

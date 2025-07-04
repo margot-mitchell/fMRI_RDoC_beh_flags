@@ -442,12 +442,23 @@ def main():
     for subject_folder in subject_folders:
         print(f"\nProcessing subject folder: {subject_folder}")
         
-        # Prepare output directory
-        output_dir = os.path.join('results', 'flags', subject_folder)
+        # Prepare output directory - create subject/session/flags structure
+        if args.session:
+            # For session-specific processing, create subject/session/flags structure
+            output_dir = os.path.join('results', 'flags', subject_folder, args.session)
+        else:
+            # For all sessions processing, create subject/flags structure
+            output_dir = os.path.join('results', 'flags', subject_folder)
         os.makedirs(output_dir, exist_ok=True)
 
-        # Get all CSV files directly in the subject metrics directory
-        metrics_dir = os.path.join('results', 'metrics', subject_folder)
+        # Get all CSV files from the appropriate metrics directory
+        if args.session:
+            # For session-specific processing, look in subject/session/metrics
+            metrics_dir = os.path.join('results', 'metrics', subject_folder, args.session)
+        else:
+            # For all sessions processing, look in subject/metrics
+            metrics_dir = os.path.join('results', 'metrics', subject_folder)
+        
         if not os.path.exists(metrics_dir):
             logging.error(f'Directory {metrics_dir} does not exist')
             continue
@@ -460,26 +471,13 @@ def main():
 
         # Filter files by session if specified
         if args.session:
-            # For session filtering, we need to check the content of each CSV file
-            # since the session info is in the 'file' column, not the filename
-            session_files = []
-            for csv_file in csv_files:
-                csv_path = os.path.join(metrics_dir, csv_file)
-                try:
-                    df = pl.read_csv(csv_path)
-                    if 'file' in df.columns:
-                        # Check if any row in the 'file' column contains the session
-                        if df.filter(pl.col('file').str.contains(args.session)).height > 0:
-                            session_files.append(csv_file)
-                except Exception as e:
-                    logging.warning(f"Error reading {csv_file}: {e}")
-                    continue
-            
-            if not session_files:
-                logging.warning(f'No files found for session {args.session} in {metrics_dir}')
-                continue
-            csv_files = session_files
+            # For session-specific processing, we're already in the session directory
+            # so all files here are for this session - no additional filtering needed
             print(f"    Processing {len(csv_files)} files for session {args.session}")
+        else:
+            # For all sessions processing, we need to check if any files contain session data
+            # This is the same logic as before
+            pass
 
         # Process each metrics file
         for metrics_file in csv_files:
