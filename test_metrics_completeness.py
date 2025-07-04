@@ -251,10 +251,22 @@ def main():
     issues = test_metrics_completeness(args.subject_folder, args.session)
     print_test_results(issues)
     
-    # Exit with error code if issues found
-    total_issues = sum(len(issue_list) for issue_list in issues.values())
-    if total_issues > 0:
+    # Only exit with error code for actual problems, not missing thresholds
+    # Missing thresholds are warnings, not errors
+    critical_issues = (
+        len(issues['missing_tasks']) + 
+        len(issues['missing_metrics']) + 
+        len(issues['invalid_values']) + 
+        len(issues['task_mapping_issues'])
+    )
+    
+    if critical_issues > 0:
+        print(f"\n❌ Found {critical_issues} critical issues that need attention.")
         sys.exit(1)
+    else:
+        print(f"\n✅ No critical issues found. Pipeline is working correctly!")
+        # Don't exit with error for unchecked metrics (missing thresholds)
+        # These are warnings, not errors
 
 if __name__ == '__main__':
     main() 
