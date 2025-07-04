@@ -442,75 +442,78 @@ def main():
     for subject_folder in subject_folders:
         print(f"\nProcessing subject folder: {subject_folder}")
         
-        # Get all task directories for this subject
+        # Prepare output directory
+        output_dir = os.path.join('results', 'flags', subject_folder)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Get all CSV files directly in the subject metrics directory
         metrics_dir = os.path.join('results', 'metrics', subject_folder)
         if not os.path.exists(metrics_dir):
             logging.error(f'Directory {metrics_dir} does not exist')
             continue
 
-        # Get all task directories
-        task_dirs = [d for d in os.listdir(metrics_dir)
-                    if os.path.isdir(os.path.join(metrics_dir, d))]
+        csv_files = [f for f in os.listdir(metrics_dir) if f.endswith('.csv')]
 
-        # Prepare output directory
-        output_dir = os.path.join('results', 'flags', subject_folder)
-        os.makedirs(output_dir, exist_ok=True)
+        if not csv_files:
+            logging.warning(f'No CSV files found in {metrics_dir}')
+            continue
 
-        # Process each task
-        for task_dir in task_dirs:
-            print(f"  Processing task: {task_dir}")
+        # Filter files by session if specified
+        if args.session:
+            # For session filtering, we need to check the content of each CSV file
+            # since the session info is in the 'file' column, not the filename
+            session_files = []
+            for csv_file in csv_files:
+                csv_path = os.path.join(metrics_dir, csv_file)
+                try:
+                    df = pl.read_csv(csv_path)
+                    if 'file' in df.columns:
+                        # Check if any row in the 'file' column contains the session
+                        if df.filter(pl.col('file').str.contains(args.session)).height > 0:
+                            session_files.append(csv_file)
+                except Exception as e:
+                    logging.warning(f"Error reading {csv_file}: {e}")
+                    continue
             
-            # Get all CSV files for this task
-            task_path = os.path.join(metrics_dir, task_dir)
-            csv_files = [f for f in os.listdir(task_path) if f.endswith('.csv')]
-
-            if not csv_files:
-                logging.warning(f'No CSV files found in {task_path}')
+            if not session_files:
+                logging.warning(f'No files found for session {args.session} in {metrics_dir}')
                 continue
+            csv_files = session_files
+            print(f"    Processing {len(csv_files)} files for session {args.session}")
 
-            # Filter files by session if specified
-            if args.session:
-                session_files = [f for f in csv_files if args.session in f]
-                if not session_files:
-                    logging.warning(f'No files found for session {args.session} in {task_path}')
-                    continue
-                csv_files = session_files
-                print(f"    Processing {len(csv_files)} files for session {args.session}")
-
-            task_flags_list = []
+        # Process each metrics file
+        for metrics_file in csv_files:
+            # Get task name from file name (remove _metrics.csv)
+            file_task_name = metrics_file.replace('_metrics.csv', '')
+            task_name = TASK_NAME_MAP.get(file_task_name)
             
-            # Process each metrics file
-            for metrics_file in csv_files:
-                # Get task name from file name (remove _metrics.csv)
-                file_task_name = metrics_file.replace('_metrics.csv', '')
-                task_name = TASK_NAME_MAP.get(file_task_name)
-                
-                if task_name is None:
-                    logging.warning(f"Unknown task name for file {metrics_file}, skipping")
-                    continue
-                
-                logging.debug(f"Processing {file_task_name} (internal name: {task_name})")
-                
-                # Read metrics from CSV
-                metrics_path = os.path.join(task_path, metrics_file)
-                task_metrics_df = pl.read_csv(metrics_path)
-                logging.debug(f"Found {len(task_metrics_df)} metrics in {metrics_file}")
-                
-                # Check thresholds
-                violations = check_thresholds_from_csv(task_metrics_df, task_name)
-                if violations:
-                    for metric, value, threshold in violations:
-                        task_flags_list.append((task_name, metric, value, threshold))
-                        logging.warning(f"Flag generated: {task_name} - {metric} = {value} (threshold: {threshold})")
+            if task_name is None:
+                logging.warning(f"Unknown task name for file {metrics_file}, skipping")
+                continue
             
-            # Save flags if any were generated
-            if task_flags_list:
-                flags_df = pl.DataFrame(task_flags_list, schema=['task', 'metric', 'value', 'threshold'], orient="row")
-                flags_path = os.path.join(output_dir, f'{task_dir}_flags.csv')
+            print(f"  Processing task: {file_task_name}")
+            logging.debug(f"Processing {file_task_name} (internal name: {task_name})")
+            
+            # Read metrics from CSV
+            metrics_path = os.path.join(metrics_dir, metrics_file)
+            task_metrics_df = pl.read_csv(metrics_path)
+            logging.debug(f"Found {len(task_metrics_df)} metrics in {metrics_file}")
+            
+            # Check thresholds
+            violations = check_thresholds_from_csv(task_metrics_df, task_name)
+            if violations:
+                flags_list = []
+                for metric, value, threshold in violations:
+                    flags_list.append((task_name, metric, value, threshold))
+                    logging.warning(f"Flag generated: {task_name} - {metric} = {value} (threshold: {threshold})")
+                
+                # Save flags for this task
+                flags_df = pl.DataFrame(flags_list, schema=['task', 'metric', 'value', 'threshold'], orient="row")
+                flags_path = os.path.join(output_dir, f'{file_task_name}_flags.csv')
                 flags_df.write_csv(flags_path)
-                logging.warning(f"Saved {len(task_flags_list)} flags to {flags_path}")
+                logging.warning(f"Saved {len(flags_list)} flags to {flags_path}")
             else:
-                print(f"No flags found for {task_dir}")
+                print(f"    No flags found for {file_task_name}")
 
 if __name__ == '__main__':
     main() 

@@ -286,20 +286,25 @@ def get_span_metrics(test_trials: pl.DataFrame):
         {'metric': list(metrics_dict.keys()), 'value': list(metrics_dict.values())}
     )
 
-def ax_cpt_rdoc(df: pl.DataFrame) -> pl.DataFrame:
+def ax_cpt_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     """Process AX-CPT task data.
 
     Args:
         df (pl.DataFrame): Input dataframe containing task data.
+        filename (str, optional): Name of the file, used to determine if it's a practice/pretouch file.
 
     Returns:
         pl.DataFrame: DataFrame with specified metrics in the requested order.
     """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+    # Use filename to determine if this is a practice/pretouch file
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
+
     if is_pretouch:
-        # For pretouch data, use all trials
+        # For pretouch/practice data, use all trials
         test_trials = df
     else:
         # For test data, filter for test trials
@@ -319,6 +324,28 @@ def ax_cpt_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     def get_metric(condition, metric_type):
         row = metrics.filter(pl.col('condition').str.to_lowercase() == condition.lower())
         return row[metric_type][0] if row.height > 0 else None
+
+    # Calculate proportion_feedback
+    def parse_feedback(x):
+        if x is None or x == '{}':
+            return 0
+        try:
+            feedback = ast.literal_eval(x)
+            return 1 if feedback else 0
+        except:
+            return 0
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
 
     # Calculate proportion_cue/fixation_responses
     fixation_cue_trials = df.filter(
@@ -345,18 +372,6 @@ def ax_cpt_rdoc(df: pl.DataFrame) -> pl.DataFrame:
         fixation_cue_responses = min(total_responses / total_test_trials, 1.0)
     else:
         fixation_cue_responses = 0.0
-
-    # Calculate proportion_feedback
-    def parse_feedback(x):
-        if x is None or x == '{}':
-            return 0
-        try:
-            feedback = ast.literal_eval(x)
-            return 1 if feedback else 0
-        except:
-            return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
 
     # Create final metrics DataFrame with specified order
     metrics_df = pl.DataFrame({
@@ -451,23 +466,16 @@ def ax_cpt_rdoc_time_resolved(df: pl.DataFrame) -> pl.DataFrame:
     organized_metrics = organize_metrics(metrics)
     return pl.concat([organized_metrics, fixation_metric])
 
-def cued_task_switching_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process cued task switching task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with 'metric' and 'value' columns.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def cued_task_switching_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process cued task switching task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
 
     test_trials = test_trials.with_columns(
@@ -511,9 +519,19 @@ def cued_task_switching_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
-    
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
+
     # Convert to long format with consistent column names
     melted = pl.DataFrame({
         'metric': [
@@ -548,23 +566,16 @@ def cued_task_switching_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     return melted
 
-def flanker_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process flanker task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with 'metric' and 'value' columns.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def flanker_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process flanker task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         trials = df
     else:
-        # For test data, filter for test trials
         trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Calculate metrics for congruent trials
@@ -588,9 +599,18 @@ def flanker_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
     
     # Create DataFrame with all metrics in the specified order
     metrics = pl.DataFrame({
@@ -616,23 +636,16 @@ def flanker_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     return metrics
 
-def go_nogo_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process go/no-go task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with specified metrics in the requested order.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def go_nogo_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process go/no-go task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Calculate go trial metrics
@@ -657,8 +670,18 @@ def go_nogo_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
     
     # Create final metrics DataFrame with specified order
     metrics_df = pl.DataFrame({
@@ -682,23 +705,16 @@ def go_nogo_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     return metrics_df
 
-def n_back_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process n-back task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with 'metric' and 'value' columns.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def n_back_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process n-back task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # If delay column doesn't exist, use condition column instead
@@ -718,8 +734,18 @@ def n_back_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
     
     # Filter out task_na metrics and ensure we have the right columns
     filtered_melted = melted.filter(~pl.col('metric').str.starts_with('task_na')).select(['metric', 'value'])
@@ -734,24 +760,17 @@ def n_back_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     return filtered_melted
 
-def operation_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process operation span task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with 'metric' and 'value' columns.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def operation_span_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process operation span task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
         processing_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
         processing_trials = df.filter(pl.col('trial_id') == 'test_inter-stimulus')
 
@@ -826,8 +845,18 @@ def operation_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
 
     # Get span metrics as DataFrame
     span_metrics = get_span_metrics(test_trials)
@@ -855,24 +884,17 @@ def operation_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     # Sort by metric name
     return final_metrics.sort('metric')
 
-def op_only_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process operation-only span task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with 'metric' and 'value' columns.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def op_only_span_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process operation-only span task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
         processing_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
         processing_trials = df.filter(pl.col('trial_id') == 'test_inter-stimulus')
 
@@ -946,8 +968,18 @@ def op_only_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = float(feedback_values.mean()) if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
     
     # Add proportion_feedback to metrics
     feedback_df = pl.DataFrame({
@@ -960,23 +992,16 @@ def op_only_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     return final_metrics
 
-def simple_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process simple span task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with 'metric' and 'value' columns.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def simple_span_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process simple span task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
 
     mean_4x4_grid_accuracy_entirely_correct = test_trials.select(
@@ -995,8 +1020,18 @@ def simple_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
     
     # Add the entirely correct accuracy metric and proportion_feedback
     new_metrics = pl.DataFrame({
@@ -1010,23 +1045,16 @@ def simple_span_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     # Sort by metric name
     return final_metrics.sort('metric')
 
-def spatial_cueing_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process spatial cueing task data and report specified metrics and proportion_feedback.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with specified metrics in the requested order.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def spatial_cueing_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process spatial cueing task data and report specified metrics and proportion_feedback."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Group by 'condition' to get metrics for each cue type
@@ -1046,8 +1074,18 @@ def spatial_cueing_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
 
     # List of cues and metrics in the requested order
     cues = ['doublecue', 'invalid', 'nocue', 'valid']
@@ -1062,23 +1100,16 @@ def spatial_cueing_rdoc(df: pl.DataFrame) -> pl.DataFrame:
 
     return pl.DataFrame({'metric': metric_names, 'value': values})
 
-def spatial_task_switching_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process spatial task switching task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with 'metric' and 'value' columns.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def spatial_task_switching_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process spatial task switching task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
 
     # Use correct_trial directly instead of calculating success
@@ -1144,8 +1175,18 @@ def spatial_task_switching_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
     
     # Add proportion_feedback
     feedback_df = pl.DataFrame({
@@ -1177,23 +1218,16 @@ def spatial_task_switching_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     ]))
     return result
 
-def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process stop signal task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with specified metrics in the requested order.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def stop_signal_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process stop signal task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Calculate go trial metrics
@@ -1234,8 +1268,18 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
     
     # Create final metrics DataFrame with specified order
     metrics_df = pl.DataFrame({
@@ -1265,23 +1309,16 @@ def stop_signal_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     return metrics_df
 
-def stroop_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process Stroop task data.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with specified metrics in the requested order.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def stroop_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process Stroop task data."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
     
     # Calculate metrics for congruent trials
@@ -1333,23 +1370,16 @@ def stroop_rdoc(df: pl.DataFrame) -> pl.DataFrame:
     
     return metrics_df
 
-def visual_search_rdoc(df: pl.DataFrame) -> pl.DataFrame:
-    """Process visual search task data and report specified metrics and proportion_feedback.
-
-    Args:
-        df (pl.DataFrame): Input dataframe containing task data.
-
-    Returns:
-        pl.DataFrame: DataFrame with specified metrics in the requested order.
-    """
-    # Check if this is a pretouch file by looking at the trial_id values
-    is_pretouch = df.filter(pl.col('trial_id').str.contains('practice')).height > 0
-    
+def visual_search_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
+    """Process visual search task data and report specified metrics and proportion_feedback."""
+    is_pretouch = False
+    if filename is not None:
+        fname = filename.lower()
+        if 'practice' in fname or 'pretouch' in fname:
+            is_pretouch = True
     if is_pretouch:
-        # For pretouch data, use all trials
         test_trials = df
     else:
-        # For test data, filter for test trials
         test_trials = df.filter(pl.col('trial_id') == 'test_trial')
 
     # Map condition and set size
@@ -1384,8 +1414,18 @@ def visual_search_rdoc(df: pl.DataFrame) -> pl.DataFrame:
             return 1 if feedback else 0
         except:
             return 0
-    feedback_values = df.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
-    proportion_feedback = feedback_values.mean() if feedback_values.len() > 0 else None
+
+    # Filter for test_feedback trials and calculate proportion_feedback
+    test_feedback_trials = df.filter(pl.col('trial_id') == 'test_feedback')
+    if test_feedback_trials.height > 0:
+        feedback_values = test_feedback_trials.select(pl.col('block_level_feedback').map_elements(parse_feedback, return_dtype=pl.Int64)).to_series()
+        # Always discount the first feedback entry
+        if feedback_values.len() > 1:
+            proportion_feedback = feedback_values.tail(-1).mean()
+        else:
+            proportion_feedback = None
+    else:
+        proportion_feedback = None
 
     # List of (condition, set_size) and metrics in the requested order
     combos = [

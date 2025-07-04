@@ -199,6 +199,25 @@ jobs:
             ls -la output/raw/${{ matrix.subject }}/${{ matrix.session }}/ 2>/dev/null || echo "Session directory not found"
           fi
           
+      - name: Check session validity
+        run: |
+          echo "Checking session validity..."
+          echo "Subject: ${{ matrix.subject }}"
+          echo "Session: '${{ matrix.session }}'"
+          
+          # Only check for empty sessions when we're supposed to be processing specific sessions
+          # Empty sessions are valid when processing all sessions for a subject
+          if [ "${{ github.event.inputs.subject_folder }}" != "" ] && [ "${{ github.event.inputs.session_names }}" != "" ]; then
+            if [ -z "${{ matrix.session }}" ] || [ "${{ matrix.session }}" = "" ]; then
+              echo "ERROR: Empty session name detected when processing specific sessions."
+              echo "This should not happen with proper filtering."
+              echo "Exiting to prevent artifact directory issues."
+              exit 1
+            fi
+          fi
+          
+          echo "Session is valid, proceeding with processing..."
+          
       - name: Process subject ${{ matrix.subject }} session ${{ matrix.session }}
         run: |
           source .venv/bin/activate
@@ -231,7 +250,7 @@ jobs:
         run: |
           echo "Organizing results for artifact upload..."
           
-          # Create clean artifact structure
+          # Create clean artifact structure - use consistent naming logic
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
             artifact_name="${{ matrix.subject }}-${{ matrix.session }}_results"
           else
@@ -266,18 +285,12 @@ jobs:
           
           # Copy metrics (session-specific)
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
-            # For session-specific processing, only copy files for this session
+            # For session-specific processing, copy the entire metrics CSV files
+            # since they contain data for this session but don't have session name in filename
             if [ -d "results/metrics/${{ matrix.subject }}" ]; then
               mkdir -p artifacts/$artifact_name/results/metrics
-              # Copy only files for this specific session
-              for task_dir in results/metrics/${{ matrix.subject }}/*/; do
-                if [ -d "$task_dir" ]; then
-                  task_name=$(basename "$task_dir")
-                  mkdir -p artifacts/$artifact_name/results/metrics/$task_name
-                  # Copy only files containing this session
-                  find "$task_dir" -name "*${{ matrix.session }}*" -type f -exec cp {} artifacts/$artifact_name/results/metrics/$task_name/ \;
-                fi
-              done
+              # Copy all CSV files for this subject (they contain the session data)
+              find "results/metrics/${{ matrix.subject }}" -name "*.csv" -type f -exec cp {} artifacts/$artifact_name/results/metrics/ \;
               echo "Copied session-specific metrics to artifacts/$artifact_name/results/metrics/"
             fi
           else
@@ -291,18 +304,12 @@ jobs:
           
           # Copy flags (session-specific) - only if flags exist
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
-            # For session-specific processing, only copy files for this session
+            # For session-specific processing, copy all flag files for this subject
+            # since they contain data for this session but may not have session name in filename
             if [ -d "results/flags/${{ matrix.subject }}" ]; then
               mkdir -p artifacts/$artifact_name/results/flags
-              # Copy only files for this specific session
-              for task_dir in results/flags/${{ matrix.subject }}/*/; do
-                if [ -d "$task_dir" ]; then
-                  task_name=$(basename "$task_dir")
-                  mkdir -p artifacts/$artifact_name/results/flags/$task_name
-                  # Copy only files containing this session
-                  find "$task_dir" -name "*${{ matrix.session }}*" -type f -exec cp {} artifacts/$artifact_name/results/flags/$task_name/ \;
-                fi
-              done
+              # Copy all flag files for this subject (they contain the session data)
+              find "results/flags/${{ matrix.subject }}" -name "*" -type f -exec cp {} artifacts/$artifact_name/results/flags/ \;
               echo "Copied session-specific flags to artifacts/$artifact_name/results/flags/"
             fi
           else
@@ -319,8 +326,7 @@ jobs:
           echo "Artifact structure created:"
           tree artifacts/$artifact_name || ls -la artifacts/$artifact_name
           
-      - name: Set artifact name
-        run: |
+          # Set the artifact name for use in subsequent steps
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
             echo "artifact_name=${{ matrix.subject }}-${{ matrix.session }}_results" >> $GITHUB_ENV
           else

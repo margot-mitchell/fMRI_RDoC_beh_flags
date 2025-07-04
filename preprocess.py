@@ -255,7 +255,29 @@ def get_trialdata_df(data: Dict) -> pl.DataFrame:
     
     # Convert lists and complex objects to strings
     data = convert_lists_to_strings(data)
-    return pl.from_dicts(data)
+    
+    # Normalize the data structure by ensuring all dictionaries have the same keys
+    all_keys = set()
+    for item in data:
+        all_keys.update(item.keys())
+    
+    # Add missing keys with None values to ensure consistent schema
+    normalized_data = []
+    for item in data:
+        normalized_item = item.copy()
+        for key in all_keys:
+            if key not in normalized_item:
+                normalized_item[key] = None
+        normalized_data.append(normalized_item)
+    
+    # Convert to DataFrame with explicit schema handling
+    try:
+        # First try with default inference
+        return pl.from_dicts(normalized_data, infer_schema_length=0)
+    except Exception as e:
+        # If that fails, try with more lenient schema inference
+        logging.warning(f"Schema inference failed, trying with more lenient approach: {e}")
+        return pl.from_dicts(normalized_data, infer_schema_length=None)
 
 
 def process_file(filepath: str, output_dir: str) -> None:

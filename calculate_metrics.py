@@ -150,7 +150,7 @@ def main():
                     df = pl.read_parquet(file_path)
                     
                     # Calculate metrics
-                    metrics = analysis_func(df)
+                    metrics = analysis_func(df, filename=parquet_file)
                     
                     # Add task and file information
                     metrics = metrics.with_columns([
