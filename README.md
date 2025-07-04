@@ -7,8 +7,6 @@ This project provides tools for preprocessing and analyzing behavioral data from
 - **Automated Processing**: GitHub Actions workflow for batch processing
 - **Session-Specific Processing**: Process individual sessions or all sessions for a subject
 - **Selective Data Sync**: Only download specific session data from Dropbox
-- **Clean Artifact Structure**: Organized results with clear file organization
-- **Accurate Inhibition Metrics**: Correct calculation of Go/NoGo and Stop Signal accuracy
 - **Quality Control Flags**: Automated flagging of problematic performance
 
 ## Setup
@@ -201,11 +199,6 @@ All thresholds are defined in `thresholds_config.py` and mapped in `generate_fla
 - **Stop Signal `stop_accuracy`**: Calculated as the proportion of stop trials with no response (successful inhibition)
 - **Accuracy rates**: Calculated as the proportion of correct test trials out of trials with a response
 - **Omission rates**: Calculated as proportion of test trials with no response within each condition
-
-### Session Processing
-- When a specific session is specified, only files in that exact session directory are processed
-- No fallback to searching parent directories or other sessions
-- Prevents accidental processing of practice files
 
 ### Data Organization
 - Raw data files are not tracked in git (added to `.gitignore`)

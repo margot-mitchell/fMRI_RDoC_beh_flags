@@ -295,11 +295,13 @@ jobs:
           # Copy metrics with proper folder structure
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
             # For session-specific processing, create subject/session/metrics structure
-            if [ -d "results/metrics/${{ matrix.subject }}" ]; then
+            if [ -d "results/metrics/${{ matrix.subject }}/${{ matrix.session }}" ]; then
               mkdir -p artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics
-              # Copy all CSV files for this subject (they contain the session data)
-              find "results/metrics/${{ matrix.subject }}" -name "*.csv" -type f -exec cp {} artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics/ \;
+              # Copy all CSV files from the session-specific directory
+              cp results/metrics/${{ matrix.subject }}/${{ matrix.session }}/*.csv artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics/
               echo "Copied session-specific metrics to artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics/"
+            else
+              echo "Warning: Session metrics directory results/metrics/${{ matrix.subject }}/${{ matrix.session }} not found"
             fi
           else
             # For all sessions processing, copy everything with subject structure
@@ -313,11 +315,13 @@ jobs:
           # Copy flags with proper folder structure - only if flags exist
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
             # For session-specific processing, create subject/session/flags structure
-            if [ -d "results/flags/${{ matrix.subject }}" ]; then
+            if [ -d "results/flags/${{ matrix.subject }}/${{ matrix.session }}" ]; then
               mkdir -p artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags
-              # Copy all flag files for this subject (they contain the session data)
-              find "results/flags/${{ matrix.subject }}" -name "*" -type f -exec cp {} artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags/ \;
+              # Copy all flag files from the session-specific directory
+              cp results/flags/${{ matrix.subject }}/${{ matrix.session }}/*.csv artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags/
               echo "Copied session-specific flags to artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags/"
+            else
+              echo "No flags found for ${{ matrix.subject }}/${{ matrix.session }} - this is good (no quality control issues detected)"
             fi
           else
             # For all sessions processing, copy everything with subject structure
