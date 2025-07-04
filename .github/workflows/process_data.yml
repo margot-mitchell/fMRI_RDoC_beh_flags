@@ -335,42 +335,61 @@ jobs:
           
           # Set the artifact name for use in subsequent steps
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ] && [ "${{ matrix.session }}" != "null" ]; then
-            echo "artifact_name=${{ matrix.subject }}-${{ matrix.session }}_results" >> $GITHUB_ENV
+            # Clean the session name to ensure it's safe for directory names
+            clean_session=$(echo "${{ matrix.session }}" | tr -cd 'a-zA-Z0-9_-')
+            if [ -n "$clean_session" ]; then
+              echo "artifact_name=${{ matrix.subject }}-${clean_session}_results" >> $GITHUB_ENV
+            else
+              echo "artifact_name=${{ matrix.subject }}_results" >> $GITHUB_ENV
+            fi
           else
-            echo "artifact_name=${{ matrix.subject }}_results" >> $GITHUB_ENV
-          fi
-          
-          # Validate the artifact name in the environment variable too
-          if [[ "${{ env.artifact_name }}" =~ [^-a-zA-Z0-9_] ]] || [[ "${{ env.artifact_name }}" =~ ^- ]] || [[ "${{ env.artifact_name }}" =~ -$ ]]; then
-            echo "ERROR: Invalid artifact name in env var '${{ env.artifact_name }}'. Using fallback."
             echo "artifact_name=${{ matrix.subject }}_results" >> $GITHUB_ENV
           fi
           
       - name: Prepare artifact for upload
         run: |
           echo "Checking if artifact directory exists and has content..."
-          if [ -d "artifacts/${{ env.artifact_name }}" ]; then
-            echo "Artifact directory exists: artifacts/${{ env.artifact_name }}"
+          
+          # Determine artifact name using the same logic as the previous step
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ] && [ "${{ matrix.session }}" != "null" ]; then
+            # Clean the session name to ensure it's safe for directory names
+            clean_session=$(echo "${{ matrix.session }}" | tr -cd 'a-zA-Z0-9_-')
+            if [ -n "$clean_session" ]; then
+              artifact_name="${{ matrix.subject }}-${clean_session}_results"
+            else
+              artifact_name="${{ matrix.subject }}_results"
+            fi
+          else
+            artifact_name="${{ matrix.subject }}_results"
+          fi
+          
+          echo "Using artifact name: $artifact_name"
+          
+          if [ -d "artifacts/$artifact_name" ]; then
+            echo "Artifact directory exists: artifacts/$artifact_name"
             echo "Contents:"
-            ls -la artifacts/${{ env.artifact_name }}/
+            ls -la artifacts/$artifact_name/
             
             # Check if directory has any content
-            if [ "$(ls -A artifacts/${{ env.artifact_name }}/ 2>/dev/null)" ]; then
+            if [ "$(ls -A artifacts/$artifact_name/ 2>/dev/null)" ]; then
               echo "Artifact directory has content, proceeding with upload..."
               # Create a simple file to ensure the directory is not empty
-              echo "Processing completed for ${{ matrix.subject }}" > artifacts/${{ env.artifact_name }}/processing_summary.txt
+              echo "Processing completed for ${{ matrix.subject }}" > artifacts/$artifact_name/processing_summary.txt
             else
               echo "Artifact directory is empty, creating placeholder..."
-              echo "No data was processed for ${{ matrix.subject }}" > artifacts/${{ env.artifact_name }}/no_data_processed.txt
+              echo "No data was processed for ${{ matrix.subject }}" > artifacts/$artifact_name/no_data_processed.txt
             fi
           else
             echo "Artifact directory does not exist, creating it with placeholder..."
-            mkdir -p artifacts/${{ env.artifact_name }}
-            echo "No data was processed for ${{ matrix.subject }}" > artifacts/${{ env.artifact_name }}/no_data_processed.txt
+            mkdir -p artifacts/$artifact_name
+            echo "No data was processed for ${{ matrix.subject }}" > artifacts/$artifact_name/no_data_processed.txt
           fi
           
           echo "Final artifact structure:"
-          tree artifacts/${{ env.artifact_name }} || ls -la artifacts/${{ env.artifact_name }}/
+          tree artifacts/$artifact_name || ls -la artifacts/$artifact_name/
+          
+          # Set the artifact name for the upload step
+          echo "artifact_name=$artifact_name" >> $GITHUB_ENV
           
       - name: Upload results for ${{ matrix.subject }}
         uses: actions/upload-artifact@v4
