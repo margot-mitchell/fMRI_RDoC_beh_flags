@@ -251,11 +251,20 @@ jobs:
           echo "Organizing results for artifact upload..."
           
           # Create clean artifact structure - use consistent naming logic
-          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+          # Handle empty session names properly to prevent malformed artifact names
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ] && [ "${{ matrix.session }}" != "null" ]; then
             artifact_name="${{ matrix.subject }}-${{ matrix.session }}_results"
           else
             artifact_name="${{ matrix.subject }}_results"
           fi
+          
+          # Validate artifact name to prevent malformed directory names
+          if [[ "$artifact_name" =~ [^-a-zA-Z0-9_] ]] || [[ "$artifact_name" =~ ^- ]] || [[ "$artifact_name" =~ -$ ]]; then
+            echo "ERROR: Invalid artifact name '$artifact_name' detected. Using fallback name."
+            artifact_name="${{ matrix.subject }}_results"
+          fi
+          
+          echo "Using artifact name: $artifact_name"
           mkdir -p artifacts/$artifact_name
           
           # Copy preprocessed data (session-specific)
@@ -325,9 +334,15 @@ jobs:
           tree artifacts/$artifact_name || ls -la artifacts/$artifact_name
           
           # Set the artifact name for use in subsequent steps
-          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
+          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ] && [ "${{ matrix.session }}" != "null" ]; then
             echo "artifact_name=${{ matrix.subject }}-${{ matrix.session }}_results" >> $GITHUB_ENV
           else
+            echo "artifact_name=${{ matrix.subject }}_results" >> $GITHUB_ENV
+          fi
+          
+          # Validate the artifact name in the environment variable too
+          if [[ "${{ env.artifact_name }}" =~ [^-a-zA-Z0-9_] ]] || [[ "${{ env.artifact_name }}" =~ ^- ]] || [[ "${{ env.artifact_name }}" =~ -$ ]]; then
+            echo "ERROR: Invalid artifact name in env var '${{ env.artifact_name }}'. Using fallback."
             echo "artifact_name=${{ matrix.subject }}_results" >> $GITHUB_ENV
           fi
           
