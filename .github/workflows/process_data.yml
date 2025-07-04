@@ -57,7 +57,7 @@ jobs:
             echo "sessions=[\"\"]" >> $GITHUB_OUTPUT
             echo "Processing all subjects: $subjects"
           elif [ -n "${{ github.event.inputs.specific_subjects }}" ]; then
-            subjects=$(echo "${{ github.event.inputs.specific_subjects }}" | tr ',' '\n' | jq -R -s -c 'split("\n")[:-1]')
+            subjects=$(echo "${{ github.event.inputs.specific_subjects }}" | tr ',' '\n' | grep -v '^[[:space:]]*$' | jq -R -s -c 'split("\n")[:-1]')
             echo "subjects=$subjects" >> $GITHUB_OUTPUT
             echo "sessions=[\"\"]" >> $GITHUB_OUTPUT
             echo "Processing specific subjects: $subjects"
@@ -65,9 +65,9 @@ jobs:
             subject="${{ github.event.inputs.subject_folder }}"
             session_names="${{ github.event.inputs.session_names }}"
             if [ -n "$session_names" ]; then
-              # Parse comma-separated list into JSON array, filter out empty strings
+              # Parse comma-separated list into JSON array, filter out empty or whitespace-only strings
               IFS=',' read -ra session_arr <<< "$session_names"
-              sessions=$(printf '%s\n' "${session_arr[@]}" | grep -v '^$' | jq -R -s -c 'split("\n")[:-1]')
+              sessions=$(printf '%s\n' "${session_arr[@]}" | grep -v '^[[:space:]]*$' | jq -R -s -c 'split("\n")[:-1]')
               echo "subjects=[\"$subject\"]" >> $GITHUB_OUTPUT
               echo "sessions=$sessions" >> $GITHUB_OUTPUT
               echo "Processing single subject and sessions: $subject/$sessions"
