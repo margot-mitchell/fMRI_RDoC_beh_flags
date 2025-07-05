@@ -202,13 +202,19 @@ jobs:
       - name: Check session validity
         run: |
           echo "Checking session validity..."
-          echo "Subject: ${{ matrix.subject }}"
+          echo "Subject: '${{ matrix.subject }}'"
           echo "Session: '${{ matrix.session }}'"
+          echo "Session length: ${#matrix.session}"
+          echo "Session hex: $(echo -n '${{ matrix.session }}' | xxd -p)"
+          
+          # Debug matrix values
+          echo "Matrix subject: '${{ matrix.subject }}'"
+          echo "Matrix session: '${{ matrix.session }}'"
           
           # Only check for empty sessions when we're supposed to be processing specific sessions
           # Empty sessions are valid when processing all sessions for a subject
           if [ "${{ github.event.inputs.subject_folder }}" != "" ] && [ "${{ github.event.inputs.session_names }}" != "" ]; then
-            if [ -z "${{ matrix.session }}" ] || [ "${{ matrix.session }}" = "" ]; then
+            if [ -z "${{ matrix.session }}" ] || [ "${{ matrix.session }}" = "" ] || [ "${{ matrix.session }}" = "null" ]; then
               echo "ERROR: Empty session name detected when processing specific sessions."
               echo "This should not happen with proper filtering."
               echo "Exiting to prevent artifact directory issues."
@@ -217,6 +223,20 @@ jobs:
           fi
           
           echo "Session is valid, proceeding with processing..."
+          
+      - name: Filter empty sessions
+        run: |
+          echo "Filtering empty sessions from matrix..."
+          echo "Original session: '${{ matrix.session }}'"
+          
+          # If session is empty, null, or just whitespace, skip this job
+          if [ -z "${{ matrix.session }}" ] || [ "${{ matrix.session }}" = "" ] || [ "${{ matrix.session }}" = "null" ] || [ "${{ matrix.session }}" = " " ]; then
+            echo "ERROR: Empty session detected in matrix. Skipping this job."
+            echo "This indicates an issue with the matrix generation."
+            exit 1
+          fi
+          
+          echo "Session is valid: '${{ matrix.session }}'"
           
       - name: Process subject ${{ matrix.subject }} session ${{ matrix.session }}
         run: |
@@ -250,13 +270,21 @@ jobs:
         run: |
           echo "Organizing results for artifact upload..."
           
-          # Create clean artifact structure - use consistent naming logic
-          # Handle empty session names properly to prevent malformed artifact names
+          # Determine artifact name using the same logic as the previous step
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ] && [ "${{ matrix.session }}" != "null" ]; then
-            artifact_name="${{ matrix.subject }}-${{ matrix.session }}_results"
+            # Clean the session name to ensure it's safe for directory names
+            clean_session=$(echo "${{ matrix.session }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd 'a-zA-Z0-9_-' | tr -s '_')
+            if [ -n "$clean_session" ]; then
+              artifact_name="${{ matrix.subject }}-${clean_session}_results"
+            else
+              artifact_name="${{ matrix.subject }}_results"
+            fi
           else
             artifact_name="${{ matrix.subject }}_results"
           fi
+          
+          # Remove any spaces and ensure clean directory name
+          artifact_name=$(echo "$artifact_name" | tr -d ' ' | tr -s '_')
           
           # Validate artifact name to prevent malformed directory names
           if [[ "$artifact_name" =~ [^-a-zA-Z0-9_] ]] || [[ "$artifact_name" =~ ^- ]] || [[ "$artifact_name" =~ -$ ]]; then
@@ -295,13 +323,11 @@ jobs:
           # Copy metrics with proper folder structure
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
             # For session-specific processing, create subject/session/metrics structure
-            if [ -d "results/metrics/${{ matrix.subject }}/${{ matrix.session }}" ]; then
+            if [ -d "results/metrics/${{ matrix.subject }}" ]; then
               mkdir -p artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics
-              # Copy all CSV files from the session-specific directory
-              cp results/metrics/${{ matrix.subject }}/${{ matrix.session }}/*.csv artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics/
+              # Copy all CSV files for this subject (they contain the session data)
+              find "results/metrics/${{ matrix.subject }}" -name "*.csv" -type f -exec cp {} artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics/ \;
               echo "Copied session-specific metrics to artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/metrics/"
-            else
-              echo "Warning: Session metrics directory results/metrics/${{ matrix.subject }}/${{ matrix.session }} not found"
             fi
           else
             # For all sessions processing, copy everything with subject structure
@@ -315,13 +341,11 @@ jobs:
           # Copy flags with proper folder structure - only if flags exist
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
             # For session-specific processing, create subject/session/flags structure
-            if [ -d "results/flags/${{ matrix.subject }}/${{ matrix.session }}" ]; then
+            if [ -d "results/flags/${{ matrix.subject }}" ]; then
               mkdir -p artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags
-              # Copy all flag files from the session-specific directory
-              cp results/flags/${{ matrix.subject }}/${{ matrix.session }}/*.csv artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags/
+              # Copy all flag files for this subject (they contain the session data)
+              find "results/flags/${{ matrix.subject }}" -name "*" -type f -exec cp {} artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags/ \;
               echo "Copied session-specific flags to artifacts/$artifact_name/results/${{ matrix.subject }}/${{ matrix.session }}/flags/"
-            else
-              echo "No flags found for ${{ matrix.subject }}/${{ matrix.session }} - this is good (no quality control issues detected)"
             fi
           else
             # For all sessions processing, copy everything with subject structure
@@ -340,7 +364,7 @@ jobs:
           # Set the artifact name for use in subsequent steps
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ] && [ "${{ matrix.session }}" != "null" ]; then
             # Clean the session name to ensure it's safe for directory names
-            clean_session=$(echo "${{ matrix.session }}" | tr -cd 'a-zA-Z0-9_-')
+            clean_session=$(echo "${{ matrix.session }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd 'a-zA-Z0-9_-' | tr -s '_')
             if [ -n "$clean_session" ]; then
               echo "artifact_name=${{ matrix.subject }}-${clean_session}_results" >> $GITHUB_ENV
             else
@@ -353,47 +377,28 @@ jobs:
       - name: Prepare artifact for upload
         run: |
           echo "Checking if artifact directory exists and has content..."
-          
-          # Determine artifact name using the same logic as the previous step
-          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ] && [ "${{ matrix.session }}" != "null" ]; then
-            # Clean the session name to ensure it's safe for directory names
-            clean_session=$(echo "${{ matrix.session }}" | tr -cd 'a-zA-Z0-9_-')
-            if [ -n "$clean_session" ]; then
-              artifact_name="${{ matrix.subject }}-${clean_session}_results"
-            else
-              artifact_name="${{ matrix.subject }}_results"
-            fi
-          else
-            artifact_name="${{ matrix.subject }}_results"
-          fi
-          
-          echo "Using artifact name: $artifact_name"
-          
-          if [ -d "artifacts/$artifact_name" ]; then
-            echo "Artifact directory exists: artifacts/$artifact_name"
+          if [ -d "artifacts/${{ env.artifact_name }}" ]; then
+            echo "Artifact directory exists: artifacts/${{ env.artifact_name }}"
             echo "Contents:"
-            ls -la artifacts/$artifact_name/
+            ls -la artifacts/${{ env.artifact_name }}/
             
             # Check if directory has any content
-            if [ "$(ls -A artifacts/$artifact_name/ 2>/dev/null)" ]; then
+            if [ "$(ls -A artifacts/${{ env.artifact_name }}/ 2>/dev/null)" ]; then
               echo "Artifact directory has content, proceeding with upload..."
               # Create a simple file to ensure the directory is not empty
-              echo "Processing completed for ${{ matrix.subject }}" > artifacts/$artifact_name/processing_summary.txt
+              echo "Processing completed for ${{ matrix.subject }}" > artifacts/${{ env.artifact_name }}/processing_summary.txt
             else
               echo "Artifact directory is empty, creating placeholder..."
-              echo "No data was processed for ${{ matrix.subject }}" > artifacts/$artifact_name/no_data_processed.txt
+              echo "No data was processed for ${{ matrix.subject }}" > artifacts/${{ env.artifact_name }}/no_data_processed.txt
             fi
           else
             echo "Artifact directory does not exist, creating it with placeholder..."
-            mkdir -p artifacts/$artifact_name
-            echo "No data was processed for ${{ matrix.subject }}" > artifacts/$artifact_name/no_data_processed.txt
+            mkdir -p artifacts/${{ env.artifact_name }}
+            echo "No data was processed for ${{ matrix.subject }}" > artifacts/${{ env.artifact_name }}/no_data_processed.txt
           fi
           
           echo "Final artifact structure:"
-          tree artifacts/$artifact_name || ls -la artifacts/$artifact_name/
-          
-          # Set the artifact name for the upload step
-          echo "artifact_name=$artifact_name" >> $GITHUB_ENV
+          tree artifacts/${{ env.artifact_name }} || ls -la artifacts/${{ env.artifact_name }}/
           
       - name: Upload results for ${{ matrix.subject }}
         uses: actions/upload-artifact@v4
