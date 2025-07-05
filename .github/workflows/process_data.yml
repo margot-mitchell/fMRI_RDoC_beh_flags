@@ -204,8 +204,6 @@ jobs:
           echo "Checking session validity..."
           echo "Subject: '${{ matrix.subject }}'"
           echo "Session: '${{ matrix.session }}'"
-          echo "Session length: ${#matrix.session}"
-          echo "Session hex: $(echo -n '${{ matrix.session }}' | xxd -p)"
           
           # Debug matrix values
           echo "Matrix subject: '${{ matrix.subject }}'"
