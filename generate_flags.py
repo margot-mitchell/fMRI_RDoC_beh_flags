@@ -71,6 +71,7 @@ METRIC_TO_THRESHOLD = {
     'ax_cpt_BX_omission_rate': 'AX_CPT_BX_OMISSION_RATE',
     'ax_cpt_AY_omission_rate': 'AX_CPT_AY_OMISSION_RATE',
     'ax_cpt_BY_omission_rate': 'AX_CPT_BY_OMISSION_RATE',
+    'proportion_cue/fixation_responses': 'CUE_FIXATION_RESPONSE_PROPORTION',
     
     # Go/NoGo
     'gonogo_go_accuracy': 'GONOGO_GO_ACCURACY_MIN',
@@ -209,6 +210,11 @@ def check_thresholds_from_csv(task_metrics_df: pl.DataFrame, task_name: str) -> 
                     threshold = THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']
                     if value is not None and value > threshold:
                         violations.append((metric, value, threshold))
+                # Special case for proportion_cue/fixation_responses
+                elif metric == 'proportion_cue/fixation_responses':
+                    threshold = THRESHOLDS['CUE_FIXATION_RESPONSE_PROPORTION']
+                    if value is not None and value > threshold:
+                        violations.append((metric, value, threshold))
                 # For RT metrics, flag if value is ABOVE threshold (too slow)
                 elif 'rt' in metric.lower():
                     if value is not None and value > threshold:
@@ -332,7 +338,8 @@ def get_all_metrics_and_thresholds(task_name: str) -> List[Tuple[str, float]]:
             ('AY_accuracy', THRESHOLDS['AX_CPT_AY_ACCURACY']),
             ('AY_omission_rate', THRESHOLDS['AX_CPT_AY_OMISSION_RATE']),
             ('BY_accuracy', THRESHOLDS['AX_CPT_BY_ACCURACY']),
-            ('BY_omission_rate', THRESHOLDS['AX_CPT_BY_OMISSION_RATE'])
+            ('BY_omission_rate', THRESHOLDS['AX_CPT_BY_OMISSION_RATE']),
+            ('proportion_cue/fixation_responses', THRESHOLDS['CUE_FIXATION_RESPONSE_PROPORTION'])
         ])
     elif task_name == 'gonogo':
         metrics_thresholds.extend([
