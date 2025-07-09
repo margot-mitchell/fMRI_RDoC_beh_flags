@@ -58,14 +58,21 @@ jobs:
               if find "$subject_dir" -type f -newermt "$START_DATE" ! -newermt "$END_DATE" | grep -q .; then
                 NEW_SUBJECTS+=("$subject")
                 
-                # Check for new sessions within this subject
+                # Check for new sessions within this subject (excluding prescan sessions)
                 for session_dir in "$subject_dir"/ses-*; do
                   if [ -d "$session_dir" ]; then
                     session=$(basename "$session_dir")
                     
+                    # Skip sessions that contain "prescan" in the name
+                    if [[ "$session" == *"prescan"* ]]; then
+                      echo "Skipping prescan session: $session"
+                      continue
+                    fi
+                    
                     # Check if this session has new data
                     if find "$session_dir" -type f -newermt "$START_DATE" ! -newermt "$END_DATE" | grep -q .; then
                       NEW_SESSIONS+=("$subject/$session")
+                      echo "Found new data in session: $subject/$session"
                     fi
                   fi
                 done
@@ -81,12 +88,12 @@ jobs:
             echo "new-subjects=$subjects_json" >> $GITHUB_OUTPUT
             echo "new-sessions=$sessions_json" >> $GITHUB_OUTPUT
             echo "Found new data for subjects: ${NEW_SUBJECTS[*]}"
-            echo "Found new sessions: ${NEW_SESSIONS[*]}"
+            echo "Found new sessions (excluding prescan): ${NEW_SESSIONS[*]}"
           else
             echo "has-new-data=false" >> $GITHUB_OUTPUT
             echo "new-subjects=[]" >> $GITHUB_OUTPUT
             echo "new-sessions=[]" >> $GITHUB_OUTPUT
-            echo "No new data found in the past week"
+            echo "No new data found in the past week (excluding prescan sessions)"
           fi
           
           # Clean up

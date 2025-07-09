@@ -72,6 +72,7 @@ The workflow runs automatically:
 ### 1. Data Detection
 - Syncs with Dropbox to check for new data
 - Identifies subjects and sessions with files modified in the past week
+- **Excludes prescan sessions** (sessions containing "prescan" in the name)
 - Only processes data that has actually changed
 
 ### 2. Processing

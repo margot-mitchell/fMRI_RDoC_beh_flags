@@ -25,13 +25,18 @@ def test_date_detection():
     
     # Test the find command logic (if we have test data)
     if os.path.exists('output/raw'):
-        print("\nTesting file detection logic...")
+        print("\nTesting file detection logic (excluding prescan sessions)...")
         for subject_dir in Path('output/raw').glob('sub-*'):
             if subject_dir.is_dir():
                 print(f"Found subject: {subject_dir.name}")
                 for session_dir in subject_dir.glob('ses-*'):
                     if session_dir.is_dir():
-                        print(f"  Found session: {session_dir.name}")
+                        session_name = session_dir.name
+                        # Skip prescan sessions
+                        if 'prescan' in session_name:
+                            print(f"  Skipping prescan session: {session_name}")
+                        else:
+                            print(f"  Found session: {session_name}")
     
     return True
 
