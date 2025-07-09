@@ -1,0 +1,329 @@
+name: Weekly Automated Data Processing
+
+on:
+  schedule:
+    # Run every Sunday at 5:00 PM UTC
+    - cron: '0 17 * * 0'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  detect-new-data:
+    runs-on: ubuntu-latest
+    outputs:
+      new-subjects: ${{ steps.detect-subjects.outputs.new-subjects }}
+      new-sessions: ${{ steps.detect-subjects.outputs.new-sessions }}
+      has-new-data: ${{ steps.detect-subjects.outputs.has-new-data }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone --version
+      
+      - name: Configure rclone
+        run: |
+          echo "Setting up rclone configuration..."
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG }}" | base64 -d > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+          
+      - name: Detect new data from past week
+        id: detect-subjects
+        run: |
+          echo "Detecting new data from the past week..."
+          
+          # Calculate date range (7 days ago to now)
+          END_DATE=$(date +%Y-%m-%d)
+          START_DATE=$(date -d "7 days ago" +%Y-%m-%d)
+          
+          echo "Checking for data modified between $START_DATE and $END_DATE"
+          
+          # Create temporary directory for sync
+          mkdir -p temp_sync/raw
+          
+          # Sync data from Dropbox to check for new files
+          rclone sync rdoc_dropbox:rdoc_fmri_behavior/output/raw/ temp_sync/raw/ --progress
+          
+          # Find subjects with data modified in the past week
+          NEW_SUBJECTS=()
+          NEW_SESSIONS=()
+          
+          # Check each subject directory for recent modifications
+          for subject_dir in temp_sync/raw/sub-*; do
+            if [ -d "$subject_dir" ]; then
+              subject=$(basename "$subject_dir")
+              
+              # Check if any files in this subject directory were modified in the past week
+              if find "$subject_dir" -type f -newermt "$START_DATE" ! -newermt "$END_DATE" | grep -q .; then
+                NEW_SUBJECTS+=("$subject")
+                
+                # Check for new sessions within this subject
+                for session_dir in "$subject_dir"/ses-*; do
+                  if [ -d "$session_dir" ]; then
+                    session=$(basename "$session_dir")
+                    
+                    # Check if this session has new data
+                    if find "$session_dir" -type f -newermt "$START_DATE" ! -newermt "$END_DATE" | grep -q .; then
+                      NEW_SESSIONS+=("$subject/$session")
+                    fi
+                  fi
+                done
+              fi
+            fi
+          done
+          
+          # Convert arrays to JSON for GitHub Actions
+          if [ ${#NEW_SUBJECTS[@]} -gt 0 ]; then
+            subjects_json=$(printf '%s\n' "${NEW_SUBJECTS[@]}" | jq -R -s -c 'split("\n")[:-1]')
+            sessions_json=$(printf '%s\n' "${NEW_SESSIONS[@]}" | jq -R -s -c 'split("\n")[:-1]')
+            echo "has-new-data=true" >> $GITHUB_OUTPUT
+            echo "new-subjects=$subjects_json" >> $GITHUB_OUTPUT
+            echo "new-sessions=$sessions_json" >> $GITHUB_OUTPUT
+            echo "Found new data for subjects: ${NEW_SUBJECTS[*]}"
+            echo "Found new sessions: ${NEW_SESSIONS[*]}"
+          else
+            echo "has-new-data=false" >> $GITHUB_OUTPUT
+            echo "new-subjects=[]" >> $GITHUB_OUTPUT
+            echo "new-sessions=[]" >> $GITHUB_OUTPUT
+            echo "No new data found in the past week"
+          fi
+          
+          # Clean up
+          rm -rf temp_sync
+
+  process-new-data:
+    needs: detect-new-data
+    if: needs.detect-new-data.outputs.has-new-data == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        subject-session: ${{ fromJson(needs.detect-new-data.outputs.new-sessions) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone --version
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Create virtual environment
+        run: |
+          echo "Creating virtual environment..."
+          python -m venv .venv
+          echo "Activating virtual environment..."
+          source .venv/bin/activate
+          echo "Python path:"
+          which python
+          echo "Installing pip in virtual environment..."
+          curl -sS https://bootstrap.pypa.io/get-pip.py | python
+          echo "Installing requirements..."
+          pip install -r requirements.txt
+          
+      - name: Configure rclone
+        run: |
+          echo "Setting up rclone configuration..."
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG }}" | base64 -d > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+          
+      - name: Parse subject and session
+        id: parse
+        run: |
+          # Parse subject-session string (format: "sub-s1/ses-1")
+          IFS='/' read -r subject session <<< "${{ matrix.subject-session }}"
+          echo "subject=$subject" >> $GITHUB_OUTPUT
+          echo "session=$session" >> $GITHUB_OUTPUT
+          echo "Processing: $subject/$session"
+          
+      - name: Create directory structure
+        run: |
+          echo "Creating required directories..."
+          mkdir -p output/raw
+          mkdir -p preprocessed_data
+          mkdir -p results/metrics
+          mkdir -p results/flags
+          
+      - name: Sync data from Dropbox
+        run: |
+          source .venv/bin/activate
+          echo "Syncing data for ${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}"
+          
+          # Sync the specific session
+          SOURCE_PATH="rdoc_dropbox:rdoc_fmri_behavior/output/raw/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/"
+          DEST_PATH="output/raw/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/"
+          
+          # Clean up any potential whitespace issues
+          SOURCE_PATH=$(echo "$SOURCE_PATH" | tr -d ' ')
+          DEST_PATH=$(echo "$DEST_PATH" | tr -d ' ')
+          
+          echo "Source: '$SOURCE_PATH'"
+          echo "Dest: '$DEST_PATH'"
+          
+          rclone sync "$SOURCE_PATH" "$DEST_PATH" --progress
+          
+      - name: Process data
+        run: |
+          source .venv/bin/activate
+          echo "Processing ${{ steps.parse.outputs.subject }} session ${{ steps.parse.outputs.session }}"
+          
+          python preprocess.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
+          python calculate_metrics.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
+          python generate_flags.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
+          
+      - name: Test metrics completeness
+        run: |
+          source .venv/bin/activate
+          echo "Testing metrics completeness for ${{ steps.parse.outputs.subject }}"
+          python test_metrics_completeness.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
+          
+      - name: Organize results for artifact
+        run: |
+          echo "Organizing results for artifact upload..."
+          
+          # Clean session name for artifact
+          clean_session=$(echo "${{ steps.parse.outputs.session }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -cd 'a-zA-Z0-9_-' | tr -s '_')
+          artifact_name="${{ steps.parse.outputs.subject }}-${clean_session}_results"
+          artifact_name=$(echo "$artifact_name" | tr -d ' ' | tr -s '_')
+          
+          echo "Using artifact name: $artifact_name"
+          mkdir -p artifacts/$artifact_name
+          
+          # Copy preprocessed data
+          if [ -d "preprocessed_data/${{ steps.parse.outputs.subject }}" ]; then
+            mkdir -p artifacts/$artifact_name/preprocessed_data
+            for task_dir in preprocessed_data/${{ steps.parse.outputs.subject }}/*/; do
+              if [ -d "$task_dir" ]; then
+                task_name=$(basename "$task_dir")
+                mkdir -p artifacts/$artifact_name/preprocessed_data/$task_name
+                find "$task_dir" -name "*${{ steps.parse.outputs.session }}*" -type f -exec cp {} artifacts/$artifact_name/preprocessed_data/$task_name/ \;
+              fi
+            done
+          fi
+          
+          # Copy metrics
+          if [ -d "results/metrics/${{ steps.parse.outputs.subject }}" ]; then
+            mkdir -p artifacts/$artifact_name/results/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/metrics
+            find "results/metrics/${{ steps.parse.outputs.subject }}" -name "*.csv" -type f -exec cp {} artifacts/$artifact_name/results/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/metrics/ \;
+          fi
+          
+          # Copy flags
+          if [ -d "results/flags/${{ steps.parse.outputs.subject }}" ]; then
+            mkdir -p artifacts/$artifact_name/results/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/flags
+            find "results/flags/${{ steps.parse.outputs.subject }}" -name "*" -type f -exec cp {} artifacts/$artifact_name/results/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/flags/ \;
+          fi
+          
+          echo "artifact_name=$artifact_name" >> $GITHUB_ENV
+          
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifact_name }}
+          path: artifacts/${{ env.artifact_name }}/
+          if-no-files-found: warn
+
+  compile-results:
+    needs: [detect-new-data, process-new-data]
+    if: needs.detect-new-data.outputs.has-new-data == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-artifacts
+          
+      - name: Compile results summary
+        id: compile
+        run: |
+          echo "Compiling results summary..."
+          
+          # Create summary directory
+          mkdir -p compiled-results
+          
+          # Process each artifact
+          for artifact_dir in downloaded-artifacts/*/; do
+            if [ -d "$artifact_dir" ]; then
+              artifact_name=$(basename "$artifact_dir")
+              echo "Processing artifact: $artifact_name"
+              
+              # Copy to compiled results
+              cp -r "$artifact_dir" compiled-results/
+            fi
+          done
+          
+          # Create summary report
+          echo "Weekly fMRI Behavioral QC Processing Report" > compiled-results/summary_report.txt
+          echo "==========================================" >> compiled-results/summary_report.txt
+          echo "" >> compiled-results/summary_report.txt
+          echo "Date: $(date)" >> compiled-results/summary_report.txt
+          echo "Workflow Run: ${{ github.run_id }}" >> compiled-results/summary_report.txt
+          echo "" >> compiled-results/summary_report.txt
+          echo "Subjects Processed:" >> compiled-results/summary_report.txt
+          find compiled-results -name "*_results" -type d | sed 's|.*/||' | sort >> compiled-results/summary_report.txt
+          echo "" >> compiled-results/summary_report.txt
+          echo "Total Artifacts: $(find compiled-results -name "*_results" -type d | wc -l)" >> compiled-results/summary_report.txt
+          echo "" >> compiled-results/summary_report.txt
+          echo "Processing completed successfully." >> compiled-results/summary_report.txt
+          
+          # Count flags (quality issues)
+          flag_count=$(find compiled-results -path "*/flags/*" -type f | wc -l)
+          echo "Quality flags found: $flag_count" >> compiled-results/summary_report.txt
+          
+          echo "flag_count=$flag_count" >> $GITHUB_OUTPUT
+          
+      - name: Upload compiled results
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-compiled-results
+          path: compiled-results/
+          retention-days: 30
+
+  send-email-notification:
+    needs: [detect-new-data, compile-results]
+    if: always() && needs.detect-new-data.outputs.has-new-data == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download compiled results
+        uses: actions/download-artifact@v4
+        with:
+          name: weekly-compiled-results
+          path: compiled-results
+          
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "Weekly fMRI Behavioral QC Processing Report - ${{ github.run_id }}"
+          to: ${{ secrets.EMAIL_RECIPIENTS }}
+          from: ${{ secrets.SMTP_USERNAME }}
+          body: |
+            Weekly fMRI Behavioral QC Processing Report
+            
+            Date: $(date)
+            Workflow Run: ${{ github.run_id }}
+            
+            Processing Summary:
+            - Subjects processed: ${{ needs.detect-new-data.outputs.new-subjects }}
+            - Sessions processed: ${{ needs.detect-new-data.outputs.new-sessions }}
+            - Quality flags found: ${{ needs.compile-results.outputs.flag_count }}
+            
+            The processing has completed successfully. Please check the GitHub Actions artifacts for detailed results.
+            
+            Repository: ${{ github.repository }}
+            Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            This is an automated message from the fMRI Behavioral QC Pipeline. 
