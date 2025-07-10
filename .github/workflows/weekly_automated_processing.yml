@@ -310,13 +310,13 @@ jobs:
       - name: Send email notification
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: ${{ secrets.SMTP_SERVER }}
-          server_port: ${{ secrets.SMTP_PORT }}
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_USERNAME }}
+          password: ${{ secrets.GMAIL_PASSWORD }}
           subject: "Weekly fMRI Behavioral QC Processing Report - ${{ github.run_id }}"
           to: ${{ secrets.EMAIL_RECIPIENTS }}
-          from: ${{ secrets.SMTP_USERNAME }}
+          from: "fMRI QC Pipeline <${{ secrets.GMAIL_USERNAME }}>"
           body: |
             Weekly fMRI Behavioral QC Processing Report
             
@@ -333,4 +333,6 @@ jobs:
             Repository: ${{ github.repository }}
             Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             
-            This is an automated message from the fMRI Behavioral QC Pipeline. 
+            ---
+            This is an automated message from the fMRI Behavioral QC Pipeline.
+            Sent via GitHub Actions workflow. 

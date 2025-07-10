@@ -8,6 +8,7 @@ This project provides tools for preprocessing and analyzing behavioral data from
 - **Session-Specific Processing**: Process individual sessions or all sessions for a subject
 - **Selective Data Sync**: Only download specific session data from Dropbox
 - **Quality Control Flags**: Automated flagging of problematic performance
+- **Gmail SMTP Notifications**: Reliable email notifications using Gmail SMTP
 
 ## Setup
 
@@ -30,25 +31,80 @@ pip install -r requirements.txt
 2. Set up the `RCLONE_CONFIG` secret in your GitHub repository
 3. Ensure your data is organized in Dropbox as: `rdoc_fmri_behavior/output/raw/<subject>/<session>/`
 
+### GitHub Secrets Configuration
+
+The automated workflows require several GitHub secrets to be configured in your repository:
+
+#### Required Secrets
+
+1. **RCLONE_CONFIG** (for Dropbox access)
+   - Base64-encoded rclone configuration
+   - Contains Dropbox authentication credentials
+
+2. **Gmail SMTP Configuration** (for automated notifications)
+   - `GMAIL_USERNAME`: Your Gmail address
+   - `GMAIL_APP_PASSWORD`: Gmail app password (not your regular password)
+   - `EMAIL_RECIPIENTS`: Comma-separated list of recipient email addresses
+
+#### Gmail SMTP Setup
+
+The pipeline uses Gmail SMTP for reliable email notifications. To set this up:
+
+1. **Enable 2-Step Verification** (if not already enabled):
+   - Go to your Google Account settings
+   - Security → 2-Step Verification → Turn on
+
+2. **Generate App Password**:
+   - Go to your Google Account settings
+   - Security → 2-Step Verification → App passwords
+   - Select "Mail" and generate a password
+   - Copy the generated 16-character password
+
+3. **Configure GitHub Secrets**:
+   - `GMAIL_USERNAME`: Your Gmail address (e.g., `your-email@gmail.com`)
+   - `GMAIL_APP_PASSWORD`: The 16-character app password you generated
+   - `EMAIL_RECIPIENTS`: Comma-separated list of recipient emails
+
+#### Setting Up Secrets
+
+1. Go to your GitHub repository
+2. Click **Settings** → **Secrets and variables** → **Actions**
+3. Click **"New repository secret"** for each required secret
+4. Enter the secret name and value
+5. Click **"Add secret"**
+
+For detailed setup instructions, see `AUTOMATION_SETUP.md`.
+
 ## Usage
 
 ### GitHub Actions Workflow (Recommended)
 
-The project includes a GitHub Actions workflow that can process data in several ways:
+The project includes GitHub Actions workflows that can process data in several ways:
 
-#### 1. Process All Subjects
+#### Automated Weekly Processing
+- **Schedule**: Runs automatically every Sunday at 5:00 PM UTC
+- **Function**: Detects new data from the past week and processes it automatically
+- **Features**: 
+  - Excludes prescan sessions from processing
+  - Sends email notifications with processing summaries via Gmail SMTP
+  - Compiles results into organized artifacts
+- **Manual Trigger**: Can also be triggered manually via GitHub Actions
+
+#### Manual Processing Options
+
+**1. Process All Subjects**
 - Set `process_all: true`
 - Processes all available subjects in parallel
 
-#### 2. Process Specific Subjects
+**2. Process Specific Subjects**
 - Set `specific_subjects: "sub-s1,sub-s2,sub-s3"`
 - Processes only the specified subjects
 
-#### 3. Process Single Subject (All Sessions)
+**3. Process Single Subject (All Sessions)**
 - Set `subject_folder: "sub-s1"`
 - Processes all sessions for the specified subject
 
-#### 4. Process Single Subject (Specific Sessions)
+**4. Process Single Subject (Specific Sessions)**
 - Set `subject_folder: "sub-s1"` and `session_names: "ses-1,ses-2"`
 - Processes only the specified sessions for the subject
 
@@ -143,7 +199,6 @@ All thresholds are defined in `thresholds_config.py` and mapped in `generate_fla
 ### Go/NoGo Task
 - `go_accuracy`: min: 0.75
 - `nogo_accuracy`: min: 0.35 
-- `go_omission_rate`: max: 0.5
 
 ### Operation Span Task
 - `8x8_grid_asymmetric_accuracy`: min: 0.55
@@ -214,21 +269,24 @@ All thresholds are defined in `thresholds_config.py` and mapped in `generate_fla
 ```
 .
 ├── .github/workflows/
-│   └── process_data.yml          # GitHub Actions workflow
+│   ├── process_data.yml                    # Manual processing workflow
+│   └── weekly_automated_processing.yml     # Automated weekly workflow
 ├── rdoc_package/
 │   ├── analyze/
 │   │   └── tasks/
-│   │       ├── tasks.py          # Task analysis functions
-│   │       └── utils.py          # Utility functions
+│   │       ├── tasks.py                    # Task analysis functions
+│   │       └── utils.py                    # Utility functions
 │   │
 │   └── ...
-├── preprocess.py                 # Data preprocessing script
-├── calculate_metrics.py          # Metrics calculation script
-├── generate_flags.py             # Quality control flag generation
-├── test_metrics_completeness.py  # Metrics completeness testing
-├── thresholds_config.py          # Quality control thresholds
-├── requirements.txt              # Python dependencies
-└── README.md                     # This file
+├── preprocess.py                           # Data preprocessing script
+├── calculate_metrics.py                    # Metrics calculation script
+├── generate_flags.py                       # Quality control flag generation
+├── test_metrics_completeness.py           # Metrics completeness testing
+├── test_automation_logic.py               # Local automation testing
+├── thresholds_config.py                    # Quality control thresholds
+├── requirements.txt                        # Python dependencies
+├── AUTOMATION_SETUP.md                     # Automated workflow setup guide
+└── README.md                               # This file
 ```
 
 ## Support
