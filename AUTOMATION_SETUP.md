@@ -28,7 +28,7 @@ Add these secrets in your GitHub repository settings:
 
 #### GMAIL_PASSWORD
 - Your Gmail app password (recommended) or regular password
-- **Note**: For better security, use an "App Password" (see GMAIL_SMTP_SETUP.md for detailed instructions)
+- **Note**: For better security, use an "App Password" (see detailed instructions below)
 
 #### EMAIL_RECIPIENTS
 - Comma-separated list of email addresses to receive notifications
@@ -36,16 +36,71 @@ Add these secrets in your GitHub repository settings:
 
 ## Setting Up Email Notifications
 
-### For Gmail (Recommended):
-1. Enable 2-factor authentication on your Google account
-2. Generate an "App Password":
-   - Go to Google Account settings
-   - Security → 2-Step Verification → App passwords
-   - Generate a password for "Mail"
-3. Use the generated password as `GMAIL_PASSWORD`
-4. Set `GMAIL_USERNAME` to your Gmail address
+### Gmail Setup (Recommended)
 
-**For detailed Gmail setup instructions, see `GMAIL_SMTP_SETUP.md`**
+We use Gmail SMTP for reliable email notifications. This approach is simpler than Gmail API and doesn't require Google Cloud project creation.
+
+#### Option 1: App Password (Recommended - More Secure)
+
+##### 1. Enable 2-Step Verification
+
+1. Go to your [Google Account settings](https://myaccount.google.com/)
+2. Click on **Security** in the left sidebar
+3. Find **2-Step Verification** and click **Get started**
+4. Follow the prompts to enable 2-Step Verification
+5. You'll need your phone to complete this step
+
+##### 2. Generate App Password
+
+1. Go to your [Google Account settings](https://myaccount.google.com/)
+2. Click on **Security** in the left sidebar
+3. Under **2-Step Verification**, click **App passwords**
+4. Click **Generate** next to "Mail"
+5. Copy the 16-character password that appears
+6. **Important**: Save this password securely - you won't be able to see it again
+
+**Note**: If you don't see "App passwords" after enabling 2-Step Verification, try:
+- Waiting 10-15 minutes
+- Going directly to: https://myaccount.google.com/apppasswords
+- Checking if your account type allows app passwords
+
+##### 3. Configure GitHub Secrets
+
+Add these secrets:
+
+1. **GMAIL_USERNAME**
+   - Value: Your Gmail address (e.g., `your-email@gmail.com`)
+
+2. **GMAIL_PASSWORD**
+   - Value: The 16-character app password you generated
+
+3. **EMAIL_RECIPIENTS**
+   - Value: Comma-separated list of recipient email addresses
+
+#### Option 2: Regular Password (Fallback - Less Secure)
+
+If app passwords are not available (e.g., work/school account restrictions):
+
+##### 1. Configure GitHub Secrets
+
+Add these secrets:
+
+1. **GMAIL_USERNAME**
+   - Value: Your Gmail address (e.g., `your-email@gmail.com`)
+
+2. **GMAIL_PASSWORD**
+   - Value: Your regular Gmail password
+
+3. **EMAIL_RECIPIENTS**
+   - Value: Comma-separated list of recipient email addresses
+
+**Note**: Using your regular password is less secure and may not work if 2-Step Verification is enabled.
+
+### Testing the Setup
+
+1. Manually trigger the workflow in GitHub Actions
+2. Check the logs in the "Send email notification" step
+3. Verify emails are received
 
 ## Workflow Schedule
 
@@ -109,9 +164,35 @@ The automated email includes:
 - Check the "detect-new-data" job logs to see what was scanned
 
 #### Email delivery issues
-- Verify Gmail credentials are correct
-- Check if you need to use an app password (see GMAIL_SMTP_SETUP.md)
-- Test with a simple email first
+
+**Common Gmail Issues:**
+
+1. **"Invalid credentials"**
+   - Make sure you're using the correct password (app password or regular password)
+   - Verify 2-Step Verification is enabled (for app passwords)
+   - Regenerate the app password if needed
+
+2. **"Authentication failed"**
+   - Check that `GMAIL_USERNAME` is your complete Gmail address
+   - Ensure `GMAIL_PASSWORD` is correct
+   - Try regenerating the app password if using Option 1
+
+3. **"Connection timeout"**
+   - Gmail SMTP is very reliable, this shouldn't happen
+   - Check your internet connection
+   - Verify the secrets are set correctly
+
+4. **"App passwords not showing up"**
+   - Wait 10-15 minutes after enabling 2-Step Verification
+   - Try the direct link: https://myaccount.google.com/apppasswords
+   - Check if your account type allows app passwords
+   - Use Option 2 (regular password) as fallback
+
+**Debugging Steps:**
+1. Check GitHub Actions logs for detailed error messages
+2. Verify all secrets are set correctly in GitHub repository settings
+3. Test with a simple email client first
+4. Regenerate the app password if needed
 
 #### Processing failures
 - Check individual job logs for specific errors
@@ -136,7 +217,12 @@ Update the `EMAIL_RECIPIENTS` secret with additional email addresses (comma-sepa
 
 - All secrets are encrypted and only accessible to repository administrators
 - Email credentials are stored securely in GitHub Secrets
-- Use app-specific passwords for Gmail accounts when possible
+- **App passwords** are specific to this application and more secure
+- **Regular passwords** are less secure but work as fallback
+- You can revoke app passwords anytime from your Google Account settings
+- Never share your passwords
+- Store them securely in GitHub Secrets
+- You can generate multiple app passwords for different applications
 - Regularly rotate email passwords for security
 
 ## Testing
@@ -157,4 +243,14 @@ sub-s4-ses-3_results/
 └── preprocessed_data/
 ```
 
-This makes it easy to download and navigate the results. 
+This makes it easy to download and navigate the results.
+
+## Support
+
+If you encounter issues:
+
+1. Check the troubleshooting section above
+2. Verify your 2-Step Verification is enabled (for app passwords)
+3. Regenerate the app password if needed
+4. Check GitHub Actions workflow logs
+5. Test with a simple email first before running the full pipeline 
