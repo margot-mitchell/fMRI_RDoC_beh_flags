@@ -335,35 +335,83 @@ jobs:
           
       - name: Send email notification
         run: |
-          # Calculate flag count
+          # Calculate flag count and breakdown by subject/session
           FLAG_COUNT=$(find compiled-results -path "*/flags/*" -type f | wc -l)
           
+          # Create detailed flag breakdown
+          FLAG_BREAKDOWN=""
+          if [ $FLAG_COUNT -gt 0 ]; then
+            echo "Creating flag breakdown..."
+            for subject_dir in compiled-results/*_results/; do
+              if [ -d "$subject_dir" ]; then
+                subject_name=$(basename "$subject_dir" | sed 's/_results$//')
+                echo "Checking flags for subject: $subject_name"
+                
+                # Check if there are flags for this subject
+                if [ -d "$subject_dir/results" ]; then
+                  for session_dir in "$subject_dir/results"/*/; do
+                    if [ -d "$session_dir" ]; then
+                      session_name=$(basename "$session_dir")
+                      if [ -d "$session_dir/flags" ]; then
+                        session_flag_count=$(find "$session_dir/flags" -type f | wc -l)
+                        if [ $session_flag_count -gt 0 ]; then
+                          if [ -z "$FLAG_BREAKDOWN" ]; then
+                            FLAG_BREAKDOWN="$subject_name/$session_name: $session_flag_count flags"
+                          else
+                            FLAG_BREAKDOWN="$FLAG_BREAKDOWN
+$subject_name/$session_name: $session_flag_count flags"
+                          fi
+                        fi
+                      fi
+                    fi
+                  done
+                fi
+              fi
+            done
+          fi
+          
+          # If no breakdown was created, use total count
+          if [ -z "$FLAG_BREAKDOWN" ]; then
+            FLAG_BREAKDOWN="$FLAG_COUNT total flags"
+          fi
+          
+          # Calculate date range (same logic as detect step)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual run: check last 7 days
+            END_DATE=$(date +%Y-%m-%d)
+            START_DATE=$(date -d "7 days ago" +%Y-%m-%d)
+          else
+            # Scheduled run (Sunday): check from last Sunday to this Sunday
+            END_DATE=$(date +%Y-%m-%d)
+            START_DATE=$(date -d "last Sunday" +%Y-%m-%d)
+          fi
+          
           # Create email body
-          cat > email_body.txt << EOF
-          Weekly fMRI Behavioral QC Processing Report
-          
-          Processing Period: ${{ needs.detect-new-data.outputs.start-date }} to ${{ needs.detect-new-data.outputs.end-date }}
-          Workflow Run: ${{ github.run_id }}
-          
-          Subjects Processed:
-          ${{ needs.detect-new-data.outputs.new-subjects }}
-          
-          Sessions Processed:
-          ${{ needs.detect-new-data.outputs.new-sessions }}
-          
-          Quality flags found: $FLAG_COUNT
-          
-          📁 DOWNLOAD RESULTS:
-          • Weekly Compiled Results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
-          • Individual Session Results: Available in the workflow artifacts above
-          
-          Repository: ${{ github.repository }}
-          Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          ---
-          This is an automated message from the fMRI Behavioral QC Pipeline.
-          Sent via GitHub Actions workflow.
-          EOF
+          cat > email_body.txt << 'EOF'
+Weekly fMRI Behavioral QC Processing Report
+
+Processing Period: $START_DATE to $END_DATE
+Workflow Run: ${{ github.run_id }}
+
+Subjects Processed:
+${{ needs.detect-new-data.outputs.new-subjects }}
+
+Sessions Processed:
+${{ needs.detect-new-data.outputs.new-sessions }}
+
+Quality flags found: $FLAG_BREAKDOWN
+
+📁 DOWNLOAD RESULTS:
+• Weekly Compiled Results and Individual Session Results can be found in the workflow artifacts
+• Go to the Run URL below and scroll down to the "Artifacts" section
+
+Repository: ${{ github.repository }}
+Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+---
+This is an automated message from the fMRI Behavioral QC Pipeline.
+Sent via GitHub Actions workflow.
+EOF
           
           # Send email using curl (alternative to action-send-mail)
           EMAIL_BODY=$(cat email_body.txt)
@@ -383,4 +431,4 @@ jobs:
           subject: "Weekly fMRI Behavioral QC Processing Report - ${{ github.run_id }}"
           to: ${{ secrets.EMAIL_RECIPIENTS }}
           from: "fMRI QC Pipeline <${{ secrets.GMAIL_USERNAME }}>"
-          body: ${{ env.EMAIL_BODY }} 
+          body: ${{ env.EMAIL_BODY }}
