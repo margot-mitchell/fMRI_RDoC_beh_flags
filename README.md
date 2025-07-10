@@ -175,7 +175,7 @@ The test runs automatically after flag generation and will fail the workflow if 
 
 ## Repository Structure
 ```
-.
+
 ├── .github/workflows/
 │   ├── process_data.yml                    # Manual processing workflow
 │   └── weekly_automated_processing.yml     # Automated weekly workflow
