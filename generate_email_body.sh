@@ -1,20 +1,35 @@
 #!/bin/bash
 
+# Debug: show the structure of compiled-results
+echo "Debug: Contents of compiled-results directory:"
+find compiled-results -type d | head -20
+
 # Calculate flag count and breakdown by subject/session
 FLAG_COUNT=$(find compiled-results -path "*/flags/*" -type f | wc -l)
+echo "Debug: Total flag count: $FLAG_COUNT"
 
 # Create detailed flag breakdown
 FLAG_BREAKDOWN=""
 if [ $FLAG_COUNT -gt 0 ]; then
-  for subject_dir in compiled-results/*_results/; do
+  echo "Debug: Creating flag breakdown..."
+  
+  # Look for flags in the actual structure
+  for subject_dir in compiled-results/*/; do
     if [ -d "$subject_dir" ]; then
-      subject_name=$(basename "$subject_dir" | sed 's/_results$//')
+      subject_name=$(basename "$subject_dir")
+      echo "Debug: Checking subject: $subject_name"
+      
+      # Look for results directory and then flags
       if [ -d "$subject_dir/results" ]; then
+        echo "Debug: Found results directory in $subject_name"
         for session_dir in "$subject_dir/results"/*/; do
           if [ -d "$session_dir" ]; then
             session_name=$(basename "$session_dir")
+            echo "Debug: Checking session: $session_name"
+            
             if [ -d "$session_dir/flags" ]; then
               session_flag_count=$(find "$session_dir/flags" -type f | wc -l)
+              echo "Debug: Found $session_flag_count flags in $subject_name/$session_name"
               if [ $session_flag_count -gt 0 ]; then
                 if [ -z "$FLAG_BREAKDOWN" ]; then
                   FLAG_BREAKDOWN="$subject_name/$session_name: $session_flag_count flags"
@@ -23,13 +38,19 @@ if [ $FLAG_COUNT -gt 0 ]; then
 $subject_name/$session_name: $session_flag_count flags"
                 fi
               fi
+            else
+              echo "Debug: No flags directory found in $subject_name/$session_name"
             fi
           fi
         done
+      else
+        echo "Debug: No results directory found in $subject_name"
       fi
     fi
   done
 fi
+
+echo "Debug: Final flag breakdown: $FLAG_BREAKDOWN"
 
 # If no breakdown was created, use total count
 if [ -z "$FLAG_BREAKDOWN" ]; then
