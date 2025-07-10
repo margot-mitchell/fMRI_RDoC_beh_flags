@@ -13,38 +13,38 @@ FLAG_BREAKDOWN=""
 if [ $FLAG_COUNT -gt 0 ]; then
   echo "Debug: Creating flag breakdown..."
   
-  # Look for flags in the actual structure
-  for subject_dir in compiled-results/*/; do
-    if [ -d "$subject_dir" ]; then
-      subject_name=$(basename "$subject_dir")
-      echo "Debug: Checking subject: $subject_name"
+  # Look for flags in the actual structure - each artifact contains one subject-session
+  for artifact_dir in compiled-results/*_results/; do
+    if [ -d "$artifact_dir" ]; then
+      artifact_name=$(basename "$artifact_dir")
+      echo "Debug: Checking artifact: $artifact_name"
       
-      # Look for results directory and then flags
-      if [ -d "$subject_dir/results" ]; then
-        echo "Debug: Found results directory in $subject_name"
-        for session_dir in "$subject_dir/results"/*/; do
-          if [ -d "$session_dir" ]; then
-            session_name=$(basename "$session_dir")
-            echo "Debug: Checking session: $session_name"
-            
-            if [ -d "$session_dir/flags" ]; then
-              session_flag_count=$(find "$session_dir/flags" -type f | wc -l)
-              echo "Debug: Found $session_flag_count flags in $subject_name/$session_name"
-              if [ $session_flag_count -gt 0 ]; then
-                if [ -z "$FLAG_BREAKDOWN" ]; then
-                  FLAG_BREAKDOWN="$subject_name/$session_name: $session_flag_count flags"
-                else
-                  FLAG_BREAKDOWN="$FLAG_BREAKDOWN
-$subject_name/$session_name: $session_flag_count flags"
-                fi
-              fi
+      # Extract subject and session from artifact name (format: sub-s4-ses-2_results)
+      subject_session=$(echo "$artifact_name" | sed 's/_results$//')
+      echo "Debug: Subject-session from artifact: $subject_session"
+      
+      # Look for flags in the results structure
+      if [ -d "$artifact_dir/results" ]; then
+        echo "Debug: Found results directory in $artifact_name"
+        
+        # Find the flags directory
+        flags_dir=$(find "$artifact_dir/results" -name "flags" -type d | head -1)
+        if [ -n "$flags_dir" ]; then
+          session_flag_count=$(find "$flags_dir" -type f | wc -l)
+          echo "Debug: Found $session_flag_count flags in $subject_session"
+          if [ $session_flag_count -gt 0 ]; then
+            if [ -z "$FLAG_BREAKDOWN" ]; then
+              FLAG_BREAKDOWN="$subject_session: $session_flag_count flags"
             else
-              echo "Debug: No flags directory found in $subject_name/$session_name"
+              FLAG_BREAKDOWN="$FLAG_BREAKDOWN
+$subject_session: $session_flag_count flags"
             fi
           fi
-        done
+        else
+          echo "Debug: No flags directory found in $artifact_name"
+        fi
       else
-        echo "Debug: No results directory found in $subject_name"
+        echo "Debug: No results directory found in $artifact_name"
       fi
     fi
   done
