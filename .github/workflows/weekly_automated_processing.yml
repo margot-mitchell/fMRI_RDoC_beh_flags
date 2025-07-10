@@ -109,12 +109,16 @@ jobs:
             echo "has-new-data=true" >> $GITHUB_OUTPUT
             echo "new-subjects=$subjects_json" >> $GITHUB_OUTPUT
             echo "new-sessions=$sessions_json" >> $GITHUB_OUTPUT
+            echo "start-date=$START_DATE" >> $GITHUB_OUTPUT
+            echo "end-date=$END_DATE" >> $GITHUB_OUTPUT
             echo "Found new data for subjects: ${NEW_SUBJECTS[*]}"
             echo "Found new sessions (excluding prescan): ${NEW_SESSIONS[*]}"
           else
             echo "has-new-data=false" >> $GITHUB_OUTPUT
             echo "new-subjects=[]" >> $GITHUB_OUTPUT
             echo "new-sessions=[]" >> $GITHUB_OUTPUT
+            echo "start-date=$START_DATE" >> $GITHUB_OUTPUT
+            echo "end-date=$END_DATE" >> $GITHUB_OUTPUT
             echo "No new data found in the past week (excluding prescan sessions)"
           fi
           
@@ -342,7 +346,7 @@ jobs:
           body: |
             Weekly fMRI Behavioral QC Processing Report
             
-            Date: $(date)
+            Processing Period: ${{ needs.detect-new-data.outputs.start-date }} to ${{ needs.detect-new-data.outputs.end-date }}
             Workflow Run: ${{ github.run_id }}
             
             Subjects Processed:
@@ -351,7 +355,7 @@ jobs:
             Sessions Processed:
             ${{ needs.detect-new-data.outputs.new-sessions }}
             
-            Quality flags found: ${{ needs.compile-results.outputs.flag_count }}
+            Quality flags found: $(find compiled-results -path "*/flags/*" -type f | wc -l)
             
             📁 DOWNLOAD RESULTS:
             • Weekly Compiled Results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
