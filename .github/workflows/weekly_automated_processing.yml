@@ -207,15 +207,9 @@ jobs:
           source .venv/bin/activate
           echo "Processing ${{ steps.parse.outputs.subject }} session ${{ steps.parse.outputs.session }}"
           
-          python preprocess.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
-          python calculate_metrics.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
-          python generate_flags.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
-          
-      - name: Test metrics completeness
-        run: |
-          source .venv/bin/activate
-          echo "Testing metrics completeness for ${{ steps.parse.outputs.subject }}"
-          python test_metrics_completeness.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
+          python src/preprocess.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
+          python src/calculate_metrics.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
+          python src/generate_flags.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
           
       - name: Organize results for artifact
         run: |

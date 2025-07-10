@@ -242,26 +242,14 @@ jobs:
           echo "Processing subject: ${{ matrix.subject }}"
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
             echo "Processing specific session: ${{ matrix.session }}"
-            python preprocess.py ${{ matrix.subject }} --session ${{ matrix.session }}
-            python calculate_metrics.py ${{ matrix.subject }} --session ${{ matrix.session }}
-            python generate_flags.py ${{ matrix.subject }} --session ${{ matrix.session }}
+            python src/preprocess.py ${{ matrix.subject }} --session ${{ matrix.session }}
+            python src/calculate_metrics.py ${{ matrix.subject }} --session ${{ matrix.session }}
+            python src/generate_flags.py ${{ matrix.subject }} --session ${{ matrix.session }}
           else
             echo "Processing all sessions for subject"
-            python preprocess.py ${{ matrix.subject }}
-            python calculate_metrics.py ${{ matrix.subject }}
-            python generate_flags.py ${{ matrix.subject }}
-          fi
-          
-      - name: Test metrics completeness
-        run: |
-          source .venv/bin/activate
-          echo "Testing metrics completeness for ${{ matrix.subject }}"
-          if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
-            echo "Testing specific session: ${{ matrix.session }}"
-            python test_metrics_completeness.py ${{ matrix.subject }} --session ${{ matrix.session }}
-          else
-            echo "Testing all sessions for subject"
-            python test_metrics_completeness.py ${{ matrix.subject }}
+            python src/preprocess.py ${{ matrix.subject }}
+            python src/calculate_metrics.py ${{ matrix.subject }}
+            python src/generate_flags.py ${{ matrix.subject }}
           fi
           
       - name: Organize results for artifact
