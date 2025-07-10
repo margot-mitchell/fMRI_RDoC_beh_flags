@@ -229,7 +229,7 @@ jobs:
           echo "Using artifact name: $artifact_name"
           mkdir -p artifacts/$artifact_name
           
-          # Copy preprocessed data
+          # Copy preprocessed data directly to artifact root
           if [ -d "preprocessed_data/${{ steps.parse.outputs.subject }}" ]; then
             mkdir -p artifacts/$artifact_name/preprocessed_data
             for task_dir in preprocessed_data/${{ steps.parse.outputs.subject }}/*/; do
@@ -241,16 +241,16 @@ jobs:
             done
           fi
           
-          # Copy metrics
+          # Copy metrics directly to artifact root
           if [ -d "results/metrics/${{ steps.parse.outputs.subject }}" ]; then
-            mkdir -p artifacts/$artifact_name/results/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/metrics
-            find "results/metrics/${{ steps.parse.outputs.subject }}" -name "*.csv" -type f -exec cp {} artifacts/$artifact_name/results/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/metrics/ \;
+            mkdir -p artifacts/$artifact_name/metrics
+            find "results/metrics/${{ steps.parse.outputs.subject }}" -name "*.csv" -type f -exec cp {} artifacts/$artifact_name/metrics/ \;
           fi
           
-          # Copy flags
+          # Copy flags directly to artifact root
           if [ -d "results/flags/${{ steps.parse.outputs.subject }}" ]; then
-            mkdir -p artifacts/$artifact_name/results/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/flags
-            find "results/flags/${{ steps.parse.outputs.subject }}" -name "*" -type f -exec cp {} artifacts/$artifact_name/results/${{ steps.parse.outputs.subject }}/${{ steps.parse.outputs.session }}/flags/ \;
+            mkdir -p artifacts/$artifact_name/flags
+            find "results/flags/${{ steps.parse.outputs.subject }}" -name "*" -type f -exec cp {} artifacts/$artifact_name/flags/ \;
           fi
           
           echo "artifact_name=$artifact_name" >> $GITHUB_ENV

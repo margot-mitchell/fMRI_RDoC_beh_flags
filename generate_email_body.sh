@@ -23,28 +23,20 @@ if [ $FLAG_COUNT -gt 0 ]; then
       subject_session=$(echo "$artifact_name" | sed 's/_results$//')
       echo "Debug: Subject-session from artifact: $subject_session"
       
-      # Look for flags in the results structure
-      if [ -d "$artifact_dir/results" ]; then
-        echo "Debug: Found results directory in $artifact_name"
-        
-        # Find the flags directory
-        flags_dir=$(find "$artifact_dir/results" -name "flags" -type d | head -1)
-        if [ -n "$flags_dir" ]; then
-          session_flag_count=$(find "$flags_dir" -type f | wc -l)
-          echo "Debug: Found $session_flag_count flags in $subject_session"
-          if [ $session_flag_count -gt 0 ]; then
-            if [ -z "$FLAG_BREAKDOWN" ]; then
-              FLAG_BREAKDOWN="$subject_session: $session_flag_count flags"
-            else
-              FLAG_BREAKDOWN="$FLAG_BREAKDOWN
+      # Look for flags directly in the artifact root (new flatter structure)
+      if [ -d "$artifact_dir/flags" ]; then
+        session_flag_count=$(find "$artifact_dir/flags" -type f | wc -l)
+        echo "Debug: Found $session_flag_count flags in $subject_session"
+        if [ $session_flag_count -gt 0 ]; then
+          if [ -z "$FLAG_BREAKDOWN" ]; then
+            FLAG_BREAKDOWN="$subject_session: $session_flag_count flags"
+          else
+            FLAG_BREAKDOWN="$FLAG_BREAKDOWN
 $subject_session: $session_flag_count flags"
-            fi
           fi
-        else
-          echo "Debug: No flags directory found in $artifact_name"
         fi
       else
-        echo "Debug: No results directory found in $artifact_name"
+        echo "Debug: No flags directory found in $artifact_name"
       fi
     fi
   done
