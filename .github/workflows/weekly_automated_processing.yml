@@ -33,11 +33,22 @@ jobs:
         run: |
           echo "Detecting new data from the past week..."
           
-          # Calculate date range (7 days ago to now)
-          END_DATE=$(date +%Y-%m-%d)
-          START_DATE=$(date -d "7 days ago" +%Y-%m-%d)
+          # Determine if this is a manual run or scheduled run
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual run: check last 7 days
+            END_DATE=$(date +%Y-%m-%d)
+            START_DATE=$(date -d "7 days ago" +%Y-%m-%d)
+            echo "Manual run detected - checking last 7 days"
+          else
+            # Scheduled run (Sunday): check from last Sunday to this Sunday
+            END_DATE=$(date +%Y-%m-%d)
+            START_DATE=$(date -d "last Sunday" +%Y-%m-%d)
+            echo "Scheduled run detected - checking from last Sunday to this Sunday"
+          fi
           
-          echo "Checking for data modified between $START_DATE and $END_DATE"
+          echo "Checking for data modified between $START_DATE and $END_DATE (inclusive)"
+          echo "Current date: $(date)"
+          echo "Run type: ${{ github.event_name }}"
           
           # Create temporary directory for sync
           mkdir -p temp_sync/raw
@@ -53,10 +64,17 @@ jobs:
           for subject_dir in temp_sync/raw/sub-*; do
             if [ -d "$subject_dir" ]; then
               subject=$(basename "$subject_dir")
+              echo "Checking subject: $subject"
               
               # Check if any files in this subject directory were modified in the past week
-              if find "$subject_dir" -type f -newermt "$START_DATE" ! -newermt "$END_DATE" | grep -q .; then
+              # Use -newermt for start date and -not -newermt for end date (exclusive)
+              # Add 1 day to END_DATE to make it inclusive
+              END_DATE_PLUS_ONE=$(date -d "$END_DATE + 1 day" +%Y-%m-%d)
+              echo "Looking for files modified between $START_DATE and $END_DATE_PLUS_ONE"
+              
+              if find "$subject_dir" -type f -newermt "$START_DATE" -not -newermt "$END_DATE_PLUS_ONE" | grep -q .; then
                 NEW_SUBJECTS+=("$subject")
+                echo "Found new data in subject: $subject"
                 
                 # Check for new sessions within this subject (excluding prescan sessions)
                 for session_dir in "$subject_dir"/ses-*; do
@@ -70,9 +88,13 @@ jobs:
                     fi
                     
                     # Check if this session has new data
-                    if find "$session_dir" -type f -newermt "$START_DATE" ! -newermt "$END_DATE" | grep -q .; then
+                    if find "$session_dir" -type f -newermt "$START_DATE" -not -newermt "$END_DATE_PLUS_ONE" | grep -q .; then
                       NEW_SESSIONS+=("$subject/$session")
                       echo "Found new data in session: $subject/$session"
+                      
+                      # Debug: show some file modification times
+                      echo "Recent files in $subject/$session:"
+                      find "$session_dir" -type f -newermt "$START_DATE" -not -newermt "$END_DATE_PLUS_ONE" -exec ls -la {} \; | head -5
                     fi
                   fi
                 done
@@ -287,6 +309,42 @@ jobs:
           
           echo "flag_count=$flag_count" >> $GITHUB_OUTPUT
           
+          # Create detailed email body
+          cat > email_body.txt << EOF
+          Weekly fMRI Behavioral QC Processing Report
+          
+          Date: $(date)
+          Workflow Run: ${{ github.run_id }}
+          
+          Subjects Processed:
+          $(find compiled-results -name "*_results" -type d | sed 's|.*/||' | sort)
+          
+          Total Artifacts: $(find compiled-results -name "*_results" -type d | wc -l)
+          
+          Processing completed successfully.
+          Quality flags found: $flag_count
+          
+          📁 DOWNLOAD RESULTS:
+          • Weekly Compiled Results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
+          • Individual Session Results: Available in the workflow artifacts above
+          
+          📋 DETAILED SUMMARY:
+          $(cat compiled-results/summary_report.txt)
+          
+          Repository: ${{ github.repository }}
+          Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          ---
+          This is an automated message from the fMRI Behavioral QC Pipeline.
+          Sent via GitHub Actions workflow.
+          EOF
+          
+          # Set email body as output
+          email_body=$(cat email_body.txt)
+          echo "email_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$email_body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
       - name: Upload compiled results
         uses: actions/upload-artifact@v4
         with:
@@ -318,21 +376,4 @@ jobs:
           to: ${{ secrets.EMAIL_RECIPIENTS }}
           from: "fMRI QC Pipeline <${{ secrets.GMAIL_USERNAME }}>"
           body: |
-            Weekly fMRI Behavioral QC Processing Report
-            
-            Date: $(date)
-            Workflow Run: ${{ github.run_id }}
-            
-            Processing Summary:
-            - Subjects processed: ${{ needs.detect-new-data.outputs.new-subjects }}
-            - Sessions processed: ${{ needs.detect-new-data.outputs.new-sessions }}
-            - Quality flags found: ${{ needs.compile-results.outputs.flag_count }}
-            
-            The processing has completed successfully. Please check the GitHub Actions artifacts for detailed results.
-            
-            Repository: ${{ github.repository }}
-            Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            
-            ---
-            This is an automated message from the fMRI Behavioral QC Pipeline.
-            Sent via GitHub Actions workflow. 
+            ${{ needs.compile-results.outputs.email_body }} 
