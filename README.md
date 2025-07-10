@@ -175,7 +175,7 @@ The test runs automatically after flag generation and will fail the workflow if 
 
 ## Repository Structure
 ```
-.
+
 ├── .github/workflows/
 │   ├── process_data.yml                    # Manual processing workflow
 │   └── weekly_automated_processing.yml     # Automated weekly workflow
@@ -202,7 +202,6 @@ The test runs automatically after flag generation and will fail the workflow if 
 │   ├── metrics/                            # Calculated metrics
 │   └── flags/                              # Quality control flags
 ├── raw_data/                               # Raw data storage
-├── output/                                 # Output files
 ├── logs/                                   # Log files
 ├── thresholds_config.py                    # Quality control thresholds
 ├── requirements.txt                        # Python dependencies
