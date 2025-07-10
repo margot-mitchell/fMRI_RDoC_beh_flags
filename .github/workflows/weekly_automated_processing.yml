@@ -334,6 +334,46 @@ jobs:
           path: compiled-results
           
       - name: Send email notification
+        run: |
+          # Calculate flag count
+          FLAG_COUNT=$(find compiled-results -path "*/flags/*" -type f | wc -l)
+          
+          # Create email body
+          cat > email_body.txt << EOF
+          Weekly fMRI Behavioral QC Processing Report
+          
+          Processing Period: ${{ needs.detect-new-data.outputs.start-date }} to ${{ needs.detect-new-data.outputs.end-date }}
+          Workflow Run: ${{ github.run_id }}
+          
+          Subjects Processed:
+          ${{ needs.detect-new-data.outputs.new-subjects }}
+          
+          Sessions Processed:
+          ${{ needs.detect-new-data.outputs.new-sessions }}
+          
+          Quality flags found: $FLAG_COUNT
+          
+          📁 DOWNLOAD RESULTS:
+          • Weekly Compiled Results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
+          • Individual Session Results: Available in the workflow artifacts above
+          
+          Repository: ${{ github.repository }}
+          Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          ---
+          This is an automated message from the fMRI Behavioral QC Pipeline.
+          Sent via GitHub Actions workflow.
+          EOF
+          
+          # Send email using curl (alternative to action-send-mail)
+          EMAIL_BODY=$(cat email_body.txt)
+          
+          # Use GitHub's built-in email action with the generated body
+          echo "EMAIL_BODY<<EOF" >> $GITHUB_ENV
+          echo "$EMAIL_BODY" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          
+      - name: Send email
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -343,27 +383,4 @@ jobs:
           subject: "Weekly fMRI Behavioral QC Processing Report - ${{ github.run_id }}"
           to: ${{ secrets.EMAIL_RECIPIENTS }}
           from: "fMRI QC Pipeline <${{ secrets.GMAIL_USERNAME }}>"
-          body: |
-            Weekly fMRI Behavioral QC Processing Report
-            
-            Processing Period: ${{ needs.detect-new-data.outputs.start-date }} to ${{ needs.detect-new-data.outputs.end-date }}
-            Workflow Run: ${{ github.run_id }}
-            
-            Subjects Processed:
-            ${{ needs.detect-new-data.outputs.new-subjects }}
-            
-            Sessions Processed:
-            ${{ needs.detect-new-data.outputs.new-sessions }}
-            
-            Quality flags found: $(find compiled-results -path "*/flags/*" -type f | wc -l)
-            
-            📁 DOWNLOAD RESULTS:
-            • Weekly Compiled Results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
-            • Individual Session Results: Available in the workflow artifacts above
-            
-            Repository: ${{ github.repository }}
-            Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            
-            ---
-            This is an automated message from the fMRI Behavioral QC Pipeline.
-            Sent via GitHub Actions workflow. 
+          body: ${{ env.EMAIL_BODY }} 
