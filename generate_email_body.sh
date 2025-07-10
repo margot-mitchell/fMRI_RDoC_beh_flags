@@ -71,9 +71,6 @@ Weekly fMRI Behavioral QC Processing Report
 Processing Period: $START_DATE to $END_DATE
 Workflow Run: $GITHUB_RUN_ID
 
-Subjects Processed:
-$SUBJECTS_CLEAN
-
 Sessions Processed:
 $SESSIONS_CLEAN
 
