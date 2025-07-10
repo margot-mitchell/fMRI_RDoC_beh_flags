@@ -240,6 +240,10 @@ jobs:
         run: |
           source .venv/bin/activate
           echo "Processing subject: ${{ matrix.subject }}"
+          
+          # Set PYTHONPATH to include current directory for rdoc_package imports
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          
           if [ -n "${{ matrix.session }}" ] && [ "${{ matrix.session }}" != "" ]; then
             echo "Processing specific session: ${{ matrix.session }}"
             python src/preprocess.py ${{ matrix.subject }} --session ${{ matrix.session }}

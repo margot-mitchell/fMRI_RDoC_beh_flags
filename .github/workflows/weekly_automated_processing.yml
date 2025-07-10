@@ -207,6 +207,9 @@ jobs:
           source .venv/bin/activate
           echo "Processing ${{ steps.parse.outputs.subject }} session ${{ steps.parse.outputs.session }}"
           
+          # Set PYTHONPATH to include current directory for rdoc_package imports
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          
           python src/preprocess.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
           python src/calculate_metrics.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
           python src/generate_flags.py ${{ steps.parse.outputs.subject }} --session ${{ steps.parse.outputs.session }}
