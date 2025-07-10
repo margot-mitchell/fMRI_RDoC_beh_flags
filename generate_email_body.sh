@@ -68,6 +68,10 @@ else
   START_DATE=$(date -d "last Sunday" +%Y-%m-%d)
 fi
 
+# Clean up the JSON arrays to remove quotes and brackets
+SUBJECTS_CLEAN=$(echo "$SUBJECTS_PROCESSED" | sed 's/\["//g' | sed 's/"\]//g' | sed 's/","/, /g')
+SESSIONS_CLEAN=$(echo "$SESSIONS_PROCESSED" | sed 's/\["//g' | sed 's/"\]//g' | sed 's/","/, /g')
+
 # Create email body
 cat > email_body.txt << EOF
 Weekly fMRI Behavioral QC Processing Report
@@ -76,12 +80,13 @@ Processing Period: $START_DATE to $END_DATE
 Workflow Run: $GITHUB_RUN_ID
 
 Subjects Processed:
-$SUBJECTS_PROCESSED
+$SUBJECTS_CLEAN
 
 Sessions Processed:
-$SESSIONS_PROCESSED
+$SESSIONS_CLEAN
 
-Quality flags found: $FLAG_BREAKDOWN
+Quality flags found:
+$FLAG_BREAKDOWN
 
 📁 DOWNLOAD RESULTS:
 • Weekly Compiled Results and Individual Session Results can be found in the workflow artifacts
