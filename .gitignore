@@ -40,8 +40,17 @@ logs/
 *.log
 rclone.conf
 
-# Test and utility scripts
+# Test and debug scripts
+test_*.py
+debug_*.py
+analyze_ax_cpt*.py
+test_automation_logic.py
+test_metrics_completeness.py
+test_minimal.py
 test_accuracy_calc.py
+debug_ax_cpt.py
+debug_ax_cpt_sub_s5.py
+debug_sub_s4.py
 discover_sessions.py
 
 # OS specific
