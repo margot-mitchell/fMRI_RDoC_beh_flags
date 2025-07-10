@@ -309,42 +309,6 @@ jobs:
           
           echo "flag_count=$flag_count" >> $GITHUB_OUTPUT
           
-          # Create detailed email body
-          cat > email_body.txt << EOF
-          Weekly fMRI Behavioral QC Processing Report
-          
-          Date: $(date)
-          Workflow Run: ${{ github.run_id }}
-          
-          Subjects Processed:
-          $(find compiled-results -name "*_results" -type d | sed 's|.*/||' | sort)
-          
-          Total Artifacts: $(find compiled-results -name "*_results" -type d | wc -l)
-          
-          Processing completed successfully.
-          Quality flags found: $flag_count
-          
-          📁 DOWNLOAD RESULTS:
-          • Weekly Compiled Results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
-          • Individual Session Results: Available in the workflow artifacts above
-          
-          📋 DETAILED SUMMARY:
-          $(cat compiled-results/summary_report.txt)
-          
-          Repository: ${{ github.repository }}
-          Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          ---
-          This is an automated message from the fMRI Behavioral QC Pipeline.
-          Sent via GitHub Actions workflow.
-          EOF
-          
-          # Set email body as output
-          email_body=$(cat email_body.txt)
-          echo "email_body<<EOF" >> $GITHUB_OUTPUT
-          echo "$email_body" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
       - name: Upload compiled results
         uses: actions/upload-artifact@v4
         with:
@@ -376,4 +340,26 @@ jobs:
           to: ${{ secrets.EMAIL_RECIPIENTS }}
           from: "fMRI QC Pipeline <${{ secrets.GMAIL_USERNAME }}>"
           body: |
-            ${{ needs.compile-results.outputs.email_body }} 
+            Weekly fMRI Behavioral QC Processing Report
+            
+            Date: $(date)
+            Workflow Run: ${{ github.run_id }}
+            
+            Subjects Processed:
+            ${{ needs.detect-new-data.outputs.new-subjects }}
+            
+            Sessions Processed:
+            ${{ needs.detect-new-data.outputs.new-sessions }}
+            
+            Quality flags found: ${{ needs.compile-results.outputs.flag_count }}
+            
+            📁 DOWNLOAD RESULTS:
+            • Weekly Compiled Results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
+            • Individual Session Results: Available in the workflow artifacts above
+            
+            Repository: ${{ github.repository }}
+            Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            ---
+            This is an automated message from the fMRI Behavioral QC Pipeline.
+            Sent via GitHub Actions workflow. 
