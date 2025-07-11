@@ -43,7 +43,7 @@ The automated workflows require several GitHub secrets to be configured in your 
 
 2. **Gmail SMTP Configuration** (for automated notifications)
    - `GMAIL_USERNAME`: Your Gmail address
-   - `GMAIL_APP_PASSWORD`: Gmail app password (not your regular password)
+   - `GMAIL_PASSWORD`: Gmail app password (not your regular password)
    - `EMAIL_RECIPIENTS`: Comma-separated list of recipient email addresses
 
 #### Gmail SMTP Setup

@@ -8,8 +8,9 @@ find compiled-results -type d | head -20
 FLAG_COUNT=$(find compiled-results -path "*/flags/*" -type f | wc -l)
 echo "Debug: Total flag count: $FLAG_COUNT"
 
-# Create detailed flag breakdown
+# Create detailed flag breakdown with actual flag details
 FLAG_BREAKDOWN=""
+DETAILED_FLAGS_FILE=$(mktemp)
 if [ $FLAG_COUNT -gt 0 ]; then
   echo "Debug: Creating flag breakdown..."
   
@@ -34,6 +35,29 @@ if [ $FLAG_COUNT -gt 0 ]; then
             FLAG_BREAKDOWN="$FLAG_BREAKDOWN
 $subject_session: $session_flag_count flags"
           fi
+          
+          # Add detailed flag information
+          echo "" >> "$DETAILED_FLAGS_FILE"
+          echo "📊 $subject_session:" >> "$DETAILED_FLAGS_FILE"
+          
+          # Process each flag file
+          for flag_file in "$artifact_dir/flags"/*.csv; do
+            if [ -f "$flag_file" ]; then
+              task_name=$(basename "$flag_file" .csv | sed 's/_flags//')
+              echo "Debug: Processing flag file: $flag_file for task: $task_name"
+              
+              # Skip header line and process each flag
+              tail -n +2 "$flag_file" | while IFS=',' read -r task metric value threshold; do
+                # Clean up the values (remove quotes if present)
+                metric=$(echo "$metric" | tr -d '"')
+                value=$(echo "$value" | tr -d '"')
+                threshold=$(echo "$threshold" | tr -d '"')
+                
+                # Format the flag details
+                echo "  • $metric: $value (threshold: $threshold)" >> "$DETAILED_FLAGS_FILE"
+              done
+            fi
+          done
         fi
       else
         echo "Debug: No flags directory found in $artifact_name"
@@ -76,6 +100,7 @@ $SESSIONS_CLEAN
 
 Quality flags found:
 $FLAG_BREAKDOWN
+$(cat "$DETAILED_FLAGS_FILE")
 
 📁 DOWNLOAD RESULTS:
 • Weekly Compiled Results and Individual Session Results can be found in the workflow artifacts
@@ -87,4 +112,7 @@ Run URL: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
 ---
 This is an automated message from the fMRI Behavioral QC Pipeline.
 Sent via GitHub Actions workflow.
-EOF 
+EOF
+
+# Clean up temporary file
+rm -f "$DETAILED_FLAGS_FILE" 
