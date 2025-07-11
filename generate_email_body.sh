@@ -24,6 +24,12 @@ if [ $FLAG_COUNT -gt 0 ]; then
       subject_session=$(echo "$artifact_name" | sed 's/_results$//')
       echo "Debug: Subject-session from artifact: $subject_session"
       
+      # Skip pretouch and prescan sessions
+      if [[ "$subject_session" == *"pretouch"* ]] || [[ "$subject_session" == *"prescan"* ]]; then
+        echo "Debug: Skipping pretouch/prescan session: $subject_session"
+        continue
+      fi
+      
       # Look for flags directly in the artifact root (new flatter structure)
       if [ -d "$artifact_dir/flags" ]; then
         session_flag_count=$(find "$artifact_dir/flags" -type f | wc -l)
@@ -38,7 +44,7 @@ $subject_session: $session_flag_count flags"
           
           # Add detailed flag information
           echo "" >> "$DETAILED_FLAGS_FILE"
-          echo "📊 $subject_session:" >> "$DETAILED_FLAGS_FILE"
+          echo "$subject_session:" >> "$DETAILED_FLAGS_FILE"
           
           # Process each flag file
           for flag_file in "$artifact_dir/flags"/*.csv; do
@@ -86,7 +92,7 @@ fi
 
 # Clean up the JSON arrays to remove quotes and brackets
 SUBJECTS_CLEAN=$(echo "$SUBJECTS_PROCESSED" | sed 's/\["//g' | sed 's/"\]//g' | sed 's/","/, /g')
-SESSIONS_CLEAN=$(echo "$SESSIONS_PROCESSED" | sed 's/\["//g' | sed 's/"\]//g' | sed 's/","/, /g')
+SESSIONS_CLEAN=$(echo "$SESSIONS_PROCESSED" | sed 's/\["//g' | sed 's/"\]//g' | sed 's/","/\n/g')
 
 # Create email body
 cat > email_body.txt << EOF
@@ -98,11 +104,11 @@ Workflow Run: $GITHUB_RUN_ID
 Sessions Processed:
 $SESSIONS_CLEAN
 
-Quality flags found:
+Quality flags found (excluding pretouch/prescan flags):
 $FLAG_BREAKDOWN
 $(cat "$DETAILED_FLAGS_FILE")
 
-📁 DOWNLOAD RESULTS:
+DOWNLOAD RESULTS:
 • Weekly Compiled Results and Individual Session Results can be found in the workflow artifacts
 • Go to the Run URL below and scroll down to the "Artifacts" section
 
