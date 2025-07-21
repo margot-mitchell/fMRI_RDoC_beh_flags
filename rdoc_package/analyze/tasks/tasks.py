@@ -389,7 +389,7 @@ def ax_cpt_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
             'BY_omission_rate',
             'BY_rt',
             'proportion_cue/fixation_responses',
-            'proportion_feedback'
+            'proportion_feedback_ax_cpt'
         ],
         'value': [
             get_metric('AX', 'accuracy'),
@@ -546,7 +546,7 @@ def cued_task_switching_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataF
             'task_switch_cue_switch_rt',
             'magnitude_accuracy',
             'parity_accuracy',
-            'proportion_feedback'
+            'proportion_feedback_cued_task_switching'
         ],
         'value': [
             metrics.filter((pl.col('task_condition') == 'stay') & (pl.col('cue_condition') == 'stay'))['accuracy'][0] if metrics.filter((pl.col('task_condition') == 'stay') & (pl.col('cue_condition') == 'stay')).height > 0 else None,
@@ -621,7 +621,7 @@ def flanker_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
             'incongruent_accuracy',
             'incongruent_omission_rate',
             'incongruent_rt',
-            'proportion_feedback'
+            'proportion_feedback_flanker'
         ],
         'value': [
             congruent_accuracy,
@@ -691,7 +691,7 @@ def go_nogo_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
             'gonogo_go_rt',
             'nogo_accuracy',
             'nogo_rt',
-            'proportion_feedback'
+            'proportion_feedback_go_nogo'
         ],
         'value': [
             go_metrics['accuracy'][0] if go_metrics.height > 0 else None,
@@ -753,7 +753,7 @@ def n_back_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     # Add proportion_feedback as a new row
     if proportion_feedback is not None:
         feedback_df = pl.DataFrame({
-            'metric': ['proportion_feedback'],
+            'metric': ['proportion_feedback_n_back'],
             'value': [proportion_feedback]
         }).select(['metric', 'value'])
         filtered_melted = pl.concat([filtered_melted, feedback_df])
@@ -870,7 +870,7 @@ def operation_span_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     additional_metrics = pl.DataFrame({
         'metric': [
             'mean_4x4_grid_accuracy_entirely_correct',
-            'proportion_feedback'
+            'proportion_feedback_op_span'
         ],
         'value': [
             mean_4x4_grid_accuracy_entirely_correct,
@@ -983,7 +983,7 @@ def op_only_span_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     
     # Add proportion_feedback to metrics
     feedback_df = pl.DataFrame({
-        'metric': ['proportion_feedback'],
+        'metric': ['proportion_feedback_op_only_span'],
         'value': [proportion_feedback]
     })
     
@@ -1035,7 +1035,7 @@ def simple_span_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     
     # Add the entirely correct accuracy metric and proportion_feedback
     new_metrics = pl.DataFrame({
-        'metric': ['mean_4x4_grid_accuracy_entirely_correct', 'proportion_feedback'],
+        'metric': ['mean_4x4_grid_accuracy_entirely_correct', 'proportion_feedback_simple_span'],
         'value': [mean_4x4_grid_accuracy_entirely_correct, proportion_feedback]
     })
     
@@ -1095,7 +1095,7 @@ def spatial_cueing_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     # Gather all metrics in order
     values = [get_metric(cue, mtype) for cue in cues for mtype in metric_types]
     # Insert proportion_feedback at the correct position (after nocue_rt)
-    metric_names.insert(9, 'proportion_feedback')
+    metric_names.insert(9, 'proportion_feedback_spatial_cueing')
     values.insert(9, proportion_feedback)
 
     return pl.DataFrame({'metric': metric_names, 'value': values})
@@ -1190,7 +1190,7 @@ def spatial_task_switching_rdoc(df: pl.DataFrame, filename: str = None) -> pl.Da
     
     # Add proportion_feedback
     feedback_df = pl.DataFrame({
-        'metric': ['proportion_feedback'],
+        'metric': ['proportion_feedback_spatial_task_switching'],
         'value': [proportion_feedback]
     })
 
@@ -1292,7 +1292,7 @@ def stop_signal_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
             'max_SSD',
             'mean_SSD',
             'final_SSD',
-            'proportion_feedback'
+            'proportion_feedback_stop_signal'
         ],
         'value': [
             go_metrics['accuracy'][0] if go_metrics.height > 0 else None,
@@ -1355,7 +1355,7 @@ def stroop_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
             'incongruent_accuracy',
             'incongruent_omission_rate',
             'incongruent_rt',
-            'proportion_feedback'
+            'proportion_feedback_stroop'
         ],
         'value': [
             congruent_accuracy,
@@ -1441,7 +1441,7 @@ def visual_search_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     values = [get_metric(cond, size, mtype) for (cond, size) in combos for mtype in metric_types]
 
     # Append proportion_feedback at the end
-    metric_names.append('proportion_feedback')
+    metric_names.append('proportion_feedback_visual_search')
     values.append(proportion_feedback)
 
     return pl.DataFrame({'metric': metric_names, 'value': values}) 

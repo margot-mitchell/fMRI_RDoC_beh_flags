@@ -156,7 +156,22 @@ METRIC_TO_THRESHOLD = {
     'congruent_accuracy': 'FLANKER_ACCURACY_CONGRUENT_ACCURACY',
     'congruent_omission_rate': 'FLANKER_CONGRUENT_OMISSION_RATE',
     'incongruent_accuracy': 'FLANKER_INCONGRUENT_ACCURACY',
-    'incongruent_omission_rate': 'FLANKER_INCONGRUENT_OMISSION_RATE'
+    'incongruent_omission_rate': 'FLANKER_INCONGRUENT_OMISSION_RATE',
+
+    # Proportion Feedback
+    'proportion_feedback_stop_signal': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_ax_cpt': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_gonogo': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_operation_span': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_operation_only_span': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_simple_span': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_nback': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_cued_ts': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_spatial_cueing': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_spatial_ts': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_stroop': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_visual_search': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_flanker': 'PROPORTION_FEEDBACK_THRESHOLD'
 }
 
 def check_thresholds_from_csv(task_metrics_df: pl.DataFrame, task_name: str) -> List[Tuple[str, float, float]]:
@@ -206,7 +221,7 @@ def check_thresholds_from_csv(task_metrics_df: pl.DataFrame, task_name: str) -> 
                         elif value > max_threshold:
                             violations.append((metric, value, max_threshold))
                 # Special case for proportion_feedback
-                elif metric == 'proportion_feedback':
+                elif metric.startswith("proportion_feedback_"):
                     threshold = THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']
                     if value is not None and value > threshold:
                         violations.append((metric, value, threshold))
@@ -307,6 +322,21 @@ def get_all_metrics_and_thresholds(task_name: str) -> List[Tuple[str, float]]:
     # Add proportion_feedback for all tasks
     metrics_thresholds.append(('proportion_feedback', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
     
+    # Add all task-specific proportion_feedback metrics
+    metrics_thresholds.append(('proportion_feedback_stop_signal', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_ax_cpt', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_gonogo', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_operation_span', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_operation_only_span', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_simple_span', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_nback', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_cued_ts', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_spatial_cueing', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_spatial_ts', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_stroop', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_visual_search', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+    metrics_thresholds.append(('proportion_feedback_flanker', THRESHOLDS['PROPORTION_FEEDBACK_THRESHOLD']))
+
     # Note: RT metrics will be added dynamically when found in the actual data
     # The general RT_THRESHOLD will be applied to all metrics with "rt" in their name
     
