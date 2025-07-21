@@ -161,14 +161,14 @@ METRIC_TO_THRESHOLD = {
     # Proportion Feedback
     'proportion_feedback_stop_signal': 'PROPORTION_FEEDBACK_THRESHOLD',
     'proportion_feedback_ax_cpt': 'PROPORTION_FEEDBACK_THRESHOLD',
-    'proportion_feedback_gonogo': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_go_nogo': 'PROPORTION_FEEDBACK_THRESHOLD',
     'proportion_feedback_operation_span': 'PROPORTION_FEEDBACK_THRESHOLD',
     'proportion_feedback_operation_only_span': 'PROPORTION_FEEDBACK_THRESHOLD',
     'proportion_feedback_simple_span': 'PROPORTION_FEEDBACK_THRESHOLD',
-    'proportion_feedback_nback': 'PROPORTION_FEEDBACK_THRESHOLD',
-    'proportion_feedback_cued_ts': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_n_back': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_cued_task_switching': 'PROPORTION_FEEDBACK_THRESHOLD',
     'proportion_feedback_spatial_cueing': 'PROPORTION_FEEDBACK_THRESHOLD',
-    'proportion_feedback_spatial_ts': 'PROPORTION_FEEDBACK_THRESHOLD',
+    'proportion_feedback_spatial_task_switching': 'PROPORTION_FEEDBACK_THRESHOLD',
     'proportion_feedback_stroop': 'PROPORTION_FEEDBACK_THRESHOLD',
     'proportion_feedback_visual_search': 'PROPORTION_FEEDBACK_THRESHOLD',
     'proportion_feedback_flanker': 'PROPORTION_FEEDBACK_THRESHOLD'

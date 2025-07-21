@@ -870,7 +870,7 @@ def operation_span_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     additional_metrics = pl.DataFrame({
         'metric': [
             'mean_4x4_grid_accuracy_entirely_correct',
-            'proportion_feedback_op_span'
+            'proportion_feedback_operation_span'
         ],
         'value': [
             mean_4x4_grid_accuracy_entirely_correct,
@@ -983,7 +983,7 @@ def op_only_span_rdoc(df: pl.DataFrame, filename: str = None) -> pl.DataFrame:
     
     # Add proportion_feedback to metrics
     feedback_df = pl.DataFrame({
-        'metric': ['proportion_feedback_op_only_span'],
+        'metric': ['proportion_feedback_operation_only_span'],
         'value': [proportion_feedback]
     })
     
