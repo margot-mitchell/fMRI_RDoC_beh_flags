@@ -32,7 +32,14 @@ if [ $FLAG_COUNT -gt 0 ]; then
       
       # Look for flags directly in the artifact root (new flatter structure)
       if [ -d "$artifact_dir/flags" ]; then
-        session_flag_count=$(find "$artifact_dir/flags" -type f | wc -l)
+        # Count flagged rows (excluding headers) in all flag CSVs for the session
+        session_flag_count=0
+        for flag_file in "$artifact_dir/flags"/*.csv; do
+          if [ -f "$flag_file" ]; then
+            count=$(awk 'NR>1' "$flag_file" | wc -l)
+            session_flag_count=$((session_flag_count + count))
+          fi
+        done
         echo "Debug: Found $session_flag_count flags in $subject_session"
         if [ $session_flag_count -gt 0 ]; then
           if [ -z "$FLAG_BREAKDOWN" ]; then
@@ -118,7 +125,7 @@ Run URL: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
 ---
 This is an automated message from the fMRI Behavioral QC Pipeline.
 Sent via GitHub Actions workflow.
-EOF
+EOF 
 
 # Clean up temporary file
 rm -f "$DETAILED_FLAGS_FILE" 
